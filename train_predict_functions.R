@@ -1,4 +1,4 @@
-# These functions are for the 'clean' script, accompanying the methods paper
+# These functions are used to train the one-class SVM, and make predictions using a set of trained models
 
 
 # Mark training/prediction sets - provide cancer genes and their corresponding cancer-promoting alteration types
