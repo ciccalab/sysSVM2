@@ -84,7 +84,7 @@ prepare_trainingPrediction = function(path = NULL,
   # Remove non-expressed genes if normal tissue expression data (e.g. GTEx) are provided
   if (!is.null(normalTissue_expressionData)){
     nonExpressed_genes = normalTissue_expressionData %>% 
-      filter(exp_level=="Not Expressed" & tissue == normalTissue_name) %>%
+      filter(exp_level=="Not expressed" & tissue == normalTissue_name) %>%
       .$entrez %>%
       unique
     
@@ -454,7 +454,7 @@ get_sysCans = function(scores, preds, normalTissue_expressionData = NULL, normal
   # Remove non-expressed genes (optional)
   if (!is.null(normalTissue_expressionData)){
     nonExpressed_genes = normalTissue_expressionData %>% 
-      filter(exp_level=="Not Expressed" & tissue == normalTissue_name) %>%
+      filter(exp_level=="Not expressed" & tissue == normalTissue_name) %>%
       .$entrez %>%
       unique
     syscan = syscan %>% filter(!(entrez %in% nonExpressed_genes))
