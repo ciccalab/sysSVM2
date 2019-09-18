@@ -133,6 +133,7 @@ prepare_trainingPrediction = function(path = NULL,
   df_scaled$type = df$type
   # Unscaled data
   df = df %>%
+    subset(!(type == "prediction" & entrez %in% truePositive_drivers$entrez)) %>%
     mutate(key = paste(sample, entrez, sep = ".")) %>%
     column_to_rownames(var = "key") %>%
     select(-sample, -entrez)
@@ -140,6 +141,7 @@ prepare_trainingPrediction = function(path = NULL,
   prediction_ns = df %>% subset(type == "prediction") %>% select(-type)
   # Scaled data
   df_scaled = df_scaled %>%
+    subset(!(type == "prediction" & entrez %in% truePositive_drivers$entrez)) %>%
     mutate(key = paste(sample, entrez, sep = ".")) %>%
     column_to_rownames(var = "key") %>%
     select(-sample, -entrez)
