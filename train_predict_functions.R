@@ -476,7 +476,7 @@ get_sysCans = function(scores, preds, normalTissue_expressionData = NULL, normal
   syscan = syscan %>%
     arrange(sample, desc(score)) %>%
     group_by(sample) %>%
-    mutate(patient.rank = rank_cond(type != "TP")) %>%
+    mutate(patient_rank = rank_cond(type != "TP")) %>%
     ungroup
   
   
@@ -627,9 +627,12 @@ score_cumulatively = function(path,
     saveRDS(preds, file = paste(step_dir, "predictions.rds", sep = "/"))
     
     
-    # Get the scores for the prediction set
-    scores = get_scores(preds, best_models)
-    # saveRDS(scores, file = paste(step_dir, "scores.rds", sep = "/"))  # syscan now has all the score information
+    # Get the scores for everything
+    scores_all = get_scores(preds, best_models)
+    # And just for the prediction set
+    scores_predictionSet = get_scores(preds %>% subset(type == "prediction"), best_models)
+    # Combine
+    scores = left_join(scores_all %>% rename(score_inclTraining = score), scores_predictionSet, by = c("sample", "entrez", "kernels_predicted", "kernels_predicted_no"))
     
     
     # Remove non-expressed genes (optional), rank non-true positive predictions
