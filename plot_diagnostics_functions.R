@@ -4,6 +4,7 @@ library(tibble)
 library(tidyr)
 library(dplyr)
 library(ggplot2)
+library(plotly)
 
 
 
@@ -123,85 +124,137 @@ plot_param_convergence = function(summaryTable, logGamma = T, title = NULL, excl
 
 
 
-# Sensitivity with parameters
-plot_sensitivityVsParams = function(cv_stats, bestModel, title = NULL, logGamma = T, exclude = '((parameter=="coef0") | (kernel=="polynomial" & parameter=="gamma"))'){
+# Sensitivity with parameters, for a single kernel
+plot_sensitivityVsParams = function(cv_stats, bestModel, thisKernel, xParam, yParam = NULL, logx = F, logy = F){
   
-  # Reshape
-  df = cv_stats %>%
-    select(iteration, sensitivity, kernel, nu, gamma, coef0, degree) %>%
-    gather("parameter", "value", c("nu", "gamma", "coef0", "degree")) %>%
-    subset((kernel=="linear" & parameter=="nu") |
-             (kernel=="polynomial") |
-             (kernel=="radial" & parameter%in%c("nu", "gamma")) |
-             (kernel=="sigmoid" & parameter%in%c("nu", "gamma", "coef0"))) %>%
-    subset(!eval(parse(text = exclude)))
-  
-  
-  # Best model sensitivity
-  bm = bestModel %>%
-    select(-iterations, -reordering, -gene_set_name, -frequency, -consecutive) %>%
-    gather("kernel_parameter", "value") %>%
-    separate(kernel_parameter, into = c("kernel", "parameter"), sep = "_")
-  bm = left_join(
-    bm %>% subset(!grepl("Sensitivity", parameter)) %>% unique,
-    bm %>% subset(parameter == "medSensitivity") %>% select(kernel, sensitivity = value),
-    by = "kernel"
-  )
-  bm = bm %>%
-    subset((kernel=="linear" & parameter=="nu") |
-             (kernel=="polynomial" & parameter%in%c("nu", "gamma", "coef0", "degree")) |
-             (kernel=="radial" & parameter%in%c("nu", "gamma")) |
-             (kernel=="sigmoid" & parameter%in%c("nu", "gamma", "coef0"))) %>%
-    subset(!eval(parse(text = exclude)))
-  
-  
-  # Use a log scale for gamma
-  if (logGamma){
-    df[df$parameter == "gamma", "value"] = log2(df[df$parameter == "gamma", "value"])
-    df[df$parameter == "gamma", "parameter"] = "gamma (log2)"
-    bm[bm$parameter == "gamma", "value"] = log2(bm[bm$parameter == "gamma", "value"])
-    bm[bm$parameter == "gamma", "parameter"] = "gamma (log2)"
-  }
-  
-  
-  # Housekeeping  
-  capFirst = function(x) {
-    firstLetters = substring(x, 1, 1)
-    firstLetters = toupper(firstLetters)
-    otherLetters = substring(x, 2)
-    paste0(firstLetters, otherLetters)
-  }
-  df$kernel = capFirst(df$kernel)
-  df$kernel = factor(df$kernel, levels = c("Linear", "Polynomial", "Radial", "Sigmoid"))
-  df$parameter = capFirst(df$parameter)
-  if (!logGamma){
-    df$parameter = factor(df$parameter, levels = c("Nu", "Gamma", "Degree", "Coef0"))
-  } else {
-    df$parameter = factor(df$parameter, levels = c("Nu", "Gamma (log2)", "Degree", "Coef0"))
-  }
-  bm$kernel = capFirst(bm$kernel)
-  bm$kernel = factor(bm$kernel, levels = c("Linear", "Polynomial", "Radial", "Sigmoid"))
-  bm$parameter = capFirst(bm$parameter)
-  if (!logGamma){
-    bm$parameter = factor(bm$parameter, levels = c("Nu", "Gamma", "Degree", "Coef0"))
-  } else {
-    bm$parameter = factor(bm$parameter, levels = c("Nu", "Gamma (log2)", "Degree", "Coef0"))
-  }
-  
+  if (is.null(yParam)){ # Make a 2D plot - sensitivity vs a single parameter, e.g. linear sensitivity vs nu
     
-  # Plot
-  p = ggplot(df, aes(x = factor(value), y = sensitivity)) +
-    geom_boxplot() +
-    geom_point(data = bm, shape = 4, col = "red") +
-    facet_grid(kernel ~ parameter, scales = "free_x") +
-    coord_cartesian(ylim = c(0, 1)) +
-    labs(x = "Parameter value", y = "Sensitivity") +
-    theme_light(base_size = 14) +
-    theme(panel.spacing.x=unit(1.5, "lines"))
+    # Reshape cv_stats
+    df = cv_stats %>%
+      subset(kernel == thisKernel) %>%
+      select(iteration, xParam = xParam, sensitivity) %>%
+      group_by(xParam) %>% 
+      summarise(mean = mean(sensitivity), sd = sd(sensitivity)) %>% 
+      ungroup
+    
+    
+    # Annotate which parameter combination was the best model
+    bm = bestModel %>%
+      select(xParam = paste(thisKernel, xParam, sep = "_")) %>%
+      mutate(bestModel = T)
+    df = df %>% left_join(bm, by = c("xParam"))
+    df[is.na(df$bestModel), "bestModel"] = F
+    df$bestModel = factor(df$bestModel)
+    
+    
+    # Log2 transform variables if requested - useful for gamma in particular
+    if (logx){
+      df$xParam = log2(df$xParam)
+      bm$xParam = log2(bm$xParam)
+      xParam = paste(xParam, "(log2)")
+    }
+    
+    
+    # Make the string distinct from the column in df
+    xParam_name = xParam
+    rm(xParam)
+    
+    
+    # Capitalise first letter of kernel name
+    substr(thisKernel, 1, 1) = toupper(substr(thisKernel, 1, 1))
+    
+    
+    # Make plot
+    p = plot_ly(data = df[df$bestModel=="TRUE",], 
+                x = ~xParam, 
+                y = ~mean, 
+                type = 'scatter', 
+                mode = 'markers',
+                marker = list(size = 15),
+                name = 'Best model', 
+                color = '#FFE1A1',
+                error_y = ~list(array = sd, color = '#000000'),
+                hoverinfo = 'text',
+                text = ~paste0("</br>", xParam_name, ": ", xParam,
+                               "</br>Mean: ", signif(mean, 3),
+                               "</br>Variance: ", signif(sd^2, 3))) %>%
+      add_trace(data = df[df$bestModel=="FALSE",], 
+                name = 'Other', 
+                color = '#683531') %>%
+      layout(title = thisKernel,
+             xaxis = list(title = xParam_name),
+             yaxis = list(title = "Sensitivity"))
+    print(p)
+    
+    
+  } else { # Make a 3D plot
+    # Reshape cv_stats
+    df = cv_stats %>%
+      subset(kernel == thisKernel) %>%
+      select(iteration, xParam = xParam, yParam = yParam, sensitivity) %>%
+      group_by(xParam, yParam) %>% 
+      summarise(mean = mean(sensitivity), sd = sd(sensitivity)) %>% 
+      ungroup
+    
+    
+    # Annotate which parameter combination was the best model
+    bm = bestModel %>%
+      select(xParam = paste(thisKernel, xParam, sep = "_"), yParam = paste(thisKernel, yParam, sep = "_")) %>%
+      mutate(bestModel = T)
+    df = df %>% left_join(bm, by = c("xParam", "yParam"))
+    df[is.na(df$bestModel), "bestModel"] = F
+    df$bestModel = factor(df$bestModel)
+    
+    
+    # Log2 transform variables if requested - useful for gamma in particular
+    if (logx){
+      df$xParam = log2(df$xParam)
+      bm$xParam = log2(bm$xParam)
+      xParam = paste(xParam, "(log2)")
+    }
+    if (logy){
+      df$yParam = log2(df$yParam)
+      bm$yParam = log2(bm$yParam)
+      yParam = paste(yParam, "(log2)")
+    }
+    
+    
+    # Make the strings distinct from the columns in df
+    xParam_name = xParam
+    yParam_name = yParam
+    rm(xParam, yParam)
+    
+    
+    # Capitalise first letter of kernel name
+    substr(thisKernel, 1, 1) = toupper(substr(thisKernel, 1, 1))
+    
+    
+    # Make plot
+    p = plot_ly(data = df[df$bestModel=="TRUE",], 
+                x = ~xParam, 
+                y = ~yParam, 
+                z = ~mean, 
+                type = 'scatter3d', 
+                mode = 'markers',
+                name = 'Best model', 
+                color = '#FFE1A1',
+                error_z = ~list(array = sd, color = '#000000'),
+                hoverinfo = 'text',
+                text = ~paste0("</br>", xParam_name, ": ", xParam,
+                               "</br>", yParam_name, ": ", yParam,
+                               "</br>Mean: ", signif(mean, 3),
+                               "</br>Variance: ", signif(sd^2, 3))) %>%
+      add_trace(data = df[df$bestModel=="FALSE",], 
+                name = 'Other', 
+                color = '#683531') %>%
+      layout(title = thisKernel,
+             scene = list(xaxis = list(title = xParam_name),
+                          yaxis = list(title = yParam_name),
+                          zaxis = list(title = "Sensitivity")))
+    print(p)
+  }
   
-  if (!is.null(title)) p = p + labs(title = title) + theme(plot.title = element_text(hjust = 0.5))
   
-  print(p)
 }
 
 
@@ -261,4 +314,3 @@ plot_sensitivityIters = function(summaryTable, title = NULL, ylim = list(c(0.8, 
 }
 
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
