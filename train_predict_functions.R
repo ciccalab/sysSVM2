@@ -1,4 +1,4 @@
-# These functions are used to train the one-class SVM, and make predictions using a set of trained models
+# These functions are for the 'clean' script, accompanying the methods paper
 
 
 # Mark training/prediction sets - provide cancer genes and their corresponding cancer-promoting alteration types
@@ -67,7 +67,7 @@ prepare_trainingPrediction = function(path = NULL,
                                       create_newDirectory = T,
                                       cohort_data,
                                       normalTissue_expressionData = NULL,
-                                      normalTissue_name = "Esophagus",
+                                      normalTissue_name = NULL,
                                       exclude_features = NULL,
                                       nonFactor_features = c("sample", "entrez", "no_ALL_muts", "no_NSI_muts", "no_NTDam_muts", "no_TRUNC_muts", "no_GOF_muts", "BND", "INV", "INS"),
                                       truePositive_drivers,
@@ -128,11 +128,12 @@ prepare_trainingPrediction = function(path = NULL,
   
   
   # Mark which alterations are "true positive" drivers, and separate into training and prediction sets
+  # Make sure that any gene included in the training set (no matter what alteration types) is not in the prediction set
   cat("Separating training and prediction sets\n")
   df = mark_truePositives(df = df, truePositive_drivers = truePositive_drivers)
   df_scaled$type = df$type
   # Unscaled data
-  df = df %>%
+  df = df %>% 
     subset(!(type == "prediction" & entrez %in% truePositive_drivers$entrez)) %>%
     mutate(key = paste(sample, entrez, sep = ".")) %>%
     column_to_rownames(var = "key") %>%
@@ -140,7 +141,7 @@ prepare_trainingPrediction = function(path = NULL,
   training_ns = df %>% subset(type == "TP")
   prediction_ns = df %>% subset(type == "prediction") %>% select(-type)
   # Scaled data
-  df_scaled = df_scaled %>%
+  df_scaled = df_scaled %>% 
     subset(!(type == "prediction" & entrez %in% truePositive_drivers$entrez)) %>%
     mutate(key = paste(sample, entrez, sep = ".")) %>%
     column_to_rownames(var = "key") %>%
@@ -165,12 +166,13 @@ prepare_trainingPrediction = function(path = NULL,
 
 # Carry out cross validation iterations, recording the sensitivity
 # Runs in a parallel environment
-run_crossValidation_par = function(path,
+run_crossValidation_par = function(inPath,
+                                   outPath = NULL,
                                    folds = 3, 
                                    iters = 100,
                                    kernels_paramGrids = list(
                                      linear = list(nu = seq(0.05, 0.35, 0.05)),
-                                     polynomial = list(nu = seq(0.05, 0.35, 0.05), gamma = 1, coef0 = 0, degree = c(3, 4)),
+                                     polynomial = list(nu = seq(0.05, 0.35, 0.05), gamma = 1, coef0 = 0, degree = c(2, 3, 4)),
                                      radial = list(nu = seq(0.05, 0.35, 0.05), gamma = 2^seq(-7, 4)),
                                      sigmoid = list(nu = seq(0.05, 0.35, 0.05), gamma = 2^seq(-7, 4), coef0 = 1)
                                    ),
@@ -185,6 +187,11 @@ run_crossValidation_par = function(path,
   require(tibble)
   require(dplyr)
   require(e1071)
+  cat("Beginning cross-validation for hyperparameter tuning\n")
+  
+  
+  # If not specified, save output to the same place where input is read from
+  if (is.null(outPath)) outPath = inPath
   
   
   ##---- Sort out directory structure for verbose mode ----
@@ -193,7 +200,7 @@ run_crossValidation_par = function(path,
   # Create the directories required for this
   if (verbose){
     # Containing directory, called CV
-    cv_dir = paste(path, "CV", sep = "/")
+    cv_dir = paste(outPath, "CV", sep = "/")
     system(paste("mkdir", cv_dir))
     
     
@@ -230,9 +237,9 @@ run_crossValidation_par = function(path,
   
   ##---- Prepare grid search ----
   
-  # Get the training data from path
+  # Get the training data from inPath
   # To avoid confusion between this and the subsets that will actually be used to train in each CV iteration, call this truePositives
-  truePositives = readRDS(paste(path, "training_set.rds", sep = "/"))
+  truePositives = readRDS(paste(inPath, "training_set.rds", sep = "/"))
   # Unique genes in the true postitive set
   truePositive_genes = truePositives %>% 
     tibble::rownames_to_column() %>% 
@@ -400,7 +407,7 @@ run_crossValidation_par = function(path,
   
   
   # Write cv_stats to file
-  cv_stats_fn = paste(path, "cv_stats.tsv", sep="/")
+  cv_stats_fn = paste(outPath, "cv_stats.tsv", sep="/")
   write_tsv(cv_stats_full, path = cv_stats_fn)
   cat("CV results written to", cv_stats_fn, "\n")
 }
@@ -408,6 +415,210 @@ run_crossValidation_par = function(path,
 
 
 
+
+# Use a CV stats file to select best models according to sensitivity
+selectParams_from_CVstats = function(cv_stats, step = NULL, output_dir = NULL){
+  
+  require(readr)
+  require(dplyr)
+  
+  
+  # If file name was provided instead of the actual data frame, load into R
+  if (is.character(cv_stats)) cv_stats = read_tsv(cv_stats, col_types = cols())
+  
+  
+  # Determine at what steps (of # of iterations) to do scoring
+  iters = max(cv_stats$iteration)
+  if (is.null(step)){
+    steps = iters
+  } else {
+    steps = seq(step, iters, step)
+    if (steps[length(steps)] != iters) steps = c(steps, iters)
+  }
+  
+  
+  # Calculate mean and SD of sensitivities at cumulative intervals
+  cv_summary = data.frame()
+  for (st in steps){
+    df = cv_stats %>%
+      subset(iteration <= st) %>%
+      group_by(kernel, nu, gamma, degree, coef0) %>%
+      summarise(mean_sensitivity = mean(sensitivity), sd_sensitivity = sd(sensitivity)) %>%
+      ungroup %>%
+      mutate(iterations_cumulative = st)
+    
+    cv_summary = rbind(cv_summary, df)
+  }
+  rm(df)
+
+  
+  # Function to convert a vector to a z-score
+  z_score = function(x) (x-mean(x)) / sd(x)
+  
+  
+  # At each iteration step for each kernel, select the parameter combination with the highest diff_z
+  # diff_z measures the relative performance based on high mean and low variance of sensitivity
+  best_models_cumulative = cv_summary %>%
+    group_by(kernel, iterations_cumulative) %>%
+    mutate(mean_z = z_score(mean_sensitivity), sd_z = z_score(sd_sensitivity)) %>%
+    mutate(diff_z = mean_z - sd_z) %>%
+    top_n(1, diff_z) %>%
+    ungroup
+  
+  
+  # For clarity, also get the final (i.e. after all CV iterations) best model parameters
+  best_model_final = best_models_cumulative %>% 
+    subset(iterations_cumulative == max(iterations_cumulative)) %>%
+    rename(iterations_total = iterations_cumulative)
+  
+  
+  # Save
+  if (!is.null(output_dir)){
+    write_tsv(best_models_cumulative, path = paste(output_dir, "best_models_cumulative.tsv", sep = "/"))
+    write_tsv(best_model_final, path = paste(output_dir, "best_model_final.tsv", sep = "/"))
+  }
+  
+  
+  # Output
+  return(list(best_model_final = best_model_final, best_models_cumulative = best_models_cumulative))
+}
+
+
+
+
+
+# Given kernel parameters (i.e. best models), train on true positives
+train_sysSVM = function(model_parameters, training_set, output_dir = NULL){
+  
+  require(readr)
+  require(dplyr)
+  require(e1071)
+  
+  
+  # Read model parameters and training data if they weren't provided directly
+  if (is.character(model_parameters)) model_parameters = read_tsv(model_parameters)
+  if (is.character(training_set)) training_set = readRDS(training_set)
+  
+  
+  # Train a ocSVM for each kernel in turn
+  trained_sysSVM = list()
+  for (i in 1:nrow(model_parameters)){
+    # Extract parameters
+    k = as.character(model_parameters$kernel[i])
+    mynu = model_parameters$nu[i]
+    mygamma = model_parameters$gamma[i]
+    mycoef0 = model_parameters$coef0[i]
+    mydegree = model_parameters$degree[i]
+    
+    
+    # Name of model, for saving
+    if (k == "linear"){
+      modelName = paste0(k, "__nu_", mynu)
+    } else if (k == "polynomial"){
+      modelName = paste0(k, "__nu_", mynu, "__gamma_", mygamma, "__coef0_", mycoef0, "__degree_", mydegree)
+    } else if (k %in% c("radial", "sigmoid")){
+      modelName = paste0(k, "__nu_", mynu, "__gamma_", mygamma, "__coef0_", mycoef0)
+    }
+    
+    
+    # Train on full training set
+    svm_model = svm(type ~ ., data = training_set, scale = FALSE, 
+                    kernel = k, type = "one-classification", 
+                    nu = mynu, gamma = mygamma, coef0 = mycoef0, degree = mydegree)
+    
+    
+    # Get sensitivity mean and variance - these are used in the final score
+    sensitivity_mean = model_parameters$mean_sensitivity[i]
+    sensitivity_var = model_parameters$sd_sensitivity[i]^2
+    
+    
+    # Add everything to list
+    trained_sysSVM[[k]] = list(
+      name = modelName,
+      svm_model = svm_model,
+      sensitivity_mean = sensitivity_mean,
+      sensitivity_var = sensitivity_var
+    )
+  }
+  
+  
+  # Save
+  if (!is.null(output_dir)) saveRDS(trained_sysSVM, paste(output_dir, "trained_sysSVM.rds", sep = "/"))
+  
+  
+  # Output
+  return(trained_sysSVM)
+}
+
+
+
+
+
+# Use a trained sysSVM model to score alterations
+predict_sysSVM = function(trained_sysSVM, prediction_set, output_dir = NULL){
+  
+  require(tidyr)
+  require(dplyr)
+  require(e1071)
+ 
+  
+  # Load trained model and prediction set if not provided directly
+  if (is.character(trained_sysSVM)) trained_sysSVM = readRDS(trained_sysSVM)
+  if (is.character(prediction_set)) prediction_set = readRDS(prediction_set)
+  
+  
+  # Get decision values and score contributions for each kernel
+  scored_data = prediction_set
+  for (k in names(trained_sysSVM)){
+    # Apply the ocSVM
+    dv = predict(trained_sysSVM[[k]]$svm_model, newdata = prediction_set, decision.values = TRUE)
+    
+    
+    # Extract predictions and decision values
+    scored_data[[paste(k, "prediction", sep = "_")]] = as.logical(dv)
+    scored_data[[paste(k, "decision_value", sep = "_")]] = as.numeric(attr(dv, "decision.values"))
+    
+    
+    # Sensitivity weighting
+    BMS_i = trained_sysSVM[[k]]$sensitivity_mean / trained_sysSVM[[k]]$sensitivity_var
+    
+    
+    # Score contribution
+    scored_data[[paste(k, "score", sep = "_")]] = scored_data %>% 
+      rownames_to_column("id") %>%
+      separate("id", into = c("sample", "entrez")) %>%
+      select(sample, decision_value = paste(k, "decision_value", sep = "_")) %>% 
+      group_by(sample) %>%
+      mutate(r = rank(decision_value), N_s = n()) %>% # base::rank assigns 1 to the lowest value, n to the highest value
+      mutate(R_igs = N_s - r + 1) %>%
+      ungroup %>%
+      mutate(score = -log10(R_igs / N_s) * BMS_i / log10(N_s)) %>%
+      .$score
+  }
+  
+  
+  # Recover sample and entrez columns
+  scored_data = scored_data %>%
+    rownames_to_column("id") %>%
+    separate("id", into = c("sample", "entrez")) %>%
+    mutate(entrez = as.numeric(entrez))
+  
+  
+  # Average scores from the different kernels
+  scored_data$score = apply(scored_data %>% select(paste(names(trained_sysSVM), "score", sep = "_")), 1, mean)
+  
+  
+  # Save
+  if (!is.null(output_dir)) saveRDS(scored_data, paste(output_dir, "scores.rds", sep = "/"))
+  
+  
+  # Output
+  return(scored_data)
+}
+
+
+
+##---- DEPRECATED ----
 
 # Calculate scores based on decision values and mean/variance of sensitivity
 get_scores = function(preds, best_models){
@@ -633,7 +844,7 @@ score_cumulatively = function(path,
     scores_predictionSet = get_scores(preds %>% subset(type == "prediction"), best_models)
     # Combine
     scores = left_join(scores_all %>% rename(score_inclTraining = score), scores_predictionSet, by = c("sample", "entrez", "kernels_predicted", "kernels_predicted_no"))
-    
+
     
     # Remove non-expressed genes (optional), rank non-true positive predictions
     syscan = get_sysCans(scores, preds, normalTissue_expressionData, normalTissue_name)
@@ -647,67 +858,9 @@ score_cumulatively = function(path,
 
 
 
-# Predict on new data, using pre-trained sysSVM models
-predict_sysSVM = function(output_dir,
-                          new_data,
-                          normalTissue_expressionData = NULL,
-                          normalTissue_name = "Esophagus",
-                          exclude_features = NULL,
-                          nonFactor_features = c("sample", "entrez", "no_ALL_muts", "no_NSI_muts", "no_NTDam_muts", "no_TRUNC_muts", "no_GOF_muts", "BND", "INV", "INS"),
-                          scaling_factors,
-                          trained_models){
-  
-  require(tidyr)
-  require(dplyr)
-  cat("Preparing data for sysSVM\n")
-  df = new_data
-  
-  
-  # Remove non-expressed genes if normal tissue expression data (e.g. GTEx) are provided
-  if (!is.null(normalTissue_expressionData)){
-    nonExpressed_genes = normalTissue_expressionData %>% 
-      filter(exp_level=="Not Expressed" & tissue == normalTissue_name) %>%
-      .$entrez %>%
-      unique
-    
-    cat("Removing", length(nonExpressed_genes), "genes not expressed in normal", normalTissue_name, "\n")
-    df = df %>% filter(!(entrez %in% nonExpressed_genes))
-  }
-  
-  
-  # Remove any features that we want to exclude
-  if (!is.null(exclude_features)) cat("Excluding features:", paste(exclude_features, collapse = ", "))
-  features = setdiff(colnames(df), exclude_features)
-  df = df %>% select(one_of(c("sample", "entrez", features)))
-  
-  
-  # Convert features with only two unique values to factors, unless otherwise specified
-  # These features will not undergo any scaling
-  twoLevel_cols = names(which(sapply(df, function(x) n_distinct(x) == 2)))
-  factorCols = setdiff(twoLevel_cols, nonFactor_features)
-  cat("Converting binary features to factors:", paste(factorCols, collapse = ", "))
-  for (col in factorCols) df[[col]] = factor(df[[col]])
-  
-  
-  # Scale the new data
-  cat("Scaling data\n")
-  scaled_df = getScaledTable(df = df, scaling.factors = scaling_factors)
-  
-  
-  # Save the scaled data
-  if (!file.exists(output_dir)){
-    dir.create(output_dir)
-  }else{
-    stop("Output directory exists, can't overwrite")
-  }
-  save(df, file = paste(output_dir,"prediction_set_noScale.Rdata", sep="/"))
-  save(scaled_df[["df_scaled"]], file = paste(output_dir, "prediction_set.Rdata", sep="/"))
-  
-  
-  # Make predictions
-  
-}
 
 
 
 
+
+       
