@@ -497,11 +497,48 @@ plot_scoreByType = function(scores, geneTypes, score_column = "score_all"){
 }
 
 
+# Patient-specific rank distributions for different gene types
+plot_rankByType = function(scores, geneTypes, score_column = "score_all"){
+  
+  # Join information
+  df = scores %>%
+    select(sample, entrez, score = score_column) %>%
+    subset(!is.na(score)) %>%
+    left_join(geneTypes, by = "entrez")
+  
+  
+  # Calculate patient-specific ranks
+  df = df %>%
+    arrange(desc(score)) %>%
+    group_by(sample) %>%
+    mutate(patient_rank = 1:n()) %>%
+    ungroup
+
+ 
+  # Plot
+  p = ggplot(df, aes(type, patient_rank, fill = type)) +
+    geom_boxplot() +
+    stat_summary(aes(label=round(..y.., 1)), fun.y=min, geom="text", size=4, position = position_nudge(y = -20)) +
+    stat_summary(aes(label=round(..y.., 1)), fun.y=max, geom="text", size=4, position = position_nudge(y = 20)) +
+    stat_summary(aes(label=round(..y.., 1)), fun.y=median, geom="label", size=4, fill="white") +
+    labs(x = NULL, y = "Patient-specific rank") +
+    scale_fill_brewer(type = "qual", palette = 4) +
+    theme_light(base_size = 14) +
+    theme(legend.position = "none", panel.grid = element_blank())
+  
+  print(p)
+  
+  return(df)
+}
+
 
 ##---- Make plots ----
 
 # Directory of a sysSVM implementation
 wdir = "noMeanScale/10000.iterations_in_20.batches"
+wdir = "originalSettings/10000.iterations_in_20.batches"
+wdir = "rmCorrFeatures_noMeanScale/10000.iterations_in_25.batches"
+wdir = "noBinaryFeatures_noMeanScale/10000.iterations_in_25.batches"
 
 
 # Load the necessary files
@@ -542,5 +579,6 @@ scores_byType_all = plot_scoreByType(scores, geneTypes, score_column = "score_al
 scores_byType_predOnly = plot_scoreByType(scores, geneTypes, score_column = "score_predOnly")
 
 
-
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+# Rank distributions for different gene types
+ranks_byType_all = plot_rankByType(scores, geneTypes, score_column = "score_all")
+ranks_byType_predOnly = plot_rankByType(scores, geneTypes, score_column = "score_predOnly")
