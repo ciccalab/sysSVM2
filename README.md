@@ -25,6 +25,7 @@ The cohort data must be formatted for sysSVM. An example sysSVM2 input file, for
 * sample: Sample identifiers
 * entrez: Gene Entrez IDs
 [//]: # (end list)
+
 and the recommended molecular feature columns are
 * no_ALL_muts: Total number of mutations in a gene
 * no_NTDam_muts: Number of truncating mutations
