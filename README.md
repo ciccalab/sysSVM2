@@ -55,12 +55,12 @@ Finally, join the two tables to create the sysSVM2 input file:
 sysSVM2_input = inner_join(molecular_data, systemsLevel_data, by = "entrez")
 ```
 ### 2. Model selection
-After preparing the input file, separate the training and prediction sets (*i.e.* canonical drivers, and the rest of genes). A list of canonical driver Tumour Suppressor Genes/Oncogenes, along with their respective driver alteration types (Loss/Gain of function) is provided.
+After preparing the input file, the next step is to separate the training and prediction sets (*i.e.* canonical drivers, and the rest of genes), and perform data normalisation. A list of canonical driver genes (tumour suppressor genes/oncogenes), along with their respective driver alteration types (loss/gain of function) is provided. By default, sysSVM2 scales numeric features to have unit standard deviation.
 ```
 canonical_drivers = readRDS("sysSVM_NN/example_data/canonical_drivers.rds")
 sysSVM_data = prepare_trainingPrediction(sysSVM2_input, canonical_drivers, output_dir = "~/test_sysSVM2")
 ```
-The training set is then used to tune SVM model parameters. By default, sysSVM2 performs three-fold Cross-Validation (CV) over a pre-determined grid of parameter combinations. The CV is run for a number of iterations, and since this can be computationally intensive the code is designed to run in a parallel environment. For example, to perform 10 CV iterations using 4 cores, run
+The training set is then used to tune SVM model parameters. By default, sysSVM2 performs three-fold Cross-Validation (CV) over a pre-determined grid of parameter combinations. The CV is run for a number of iterations, and since this can be computationally intensive, the code is designed to run in a parallel environment. For example, to perform 10 CV iterations using 4 cores, run
 ```
 cv_stats = run_crossValidation_par(iters = 10,
                                    cores = 4, 
@@ -68,12 +68,12 @@ cv_stats = run_crossValidation_par(iters = 10,
                                    outPath = "~/test_sysSVM2",
                                    parallelLib = "parallel")
 ```
-The ```parallelLib``` argument should be set either to ```"parallel"``` or ```"snow"```, depending on the user's environment. In practice, we recommend using at least 1,000 CV iterations. 
+The ```parallelLib``` argument should be set to either ```"parallel"``` or ```"snow"```, depending on the user's environment. In practice, we recommend using at least 1,000 CV iterations. 
 \
 \
 After the CV iterations have been run, their results are assessed to identify the best parameter combinations:
 ```
-model_selection = selectParams_from_CVstats(cv_stats, output_dir = test_dir)
+model_selection = selectParams_from_CVstats(cv_stats, output_dir = "~/test_sysSVM2")
 ```
 ### 3. Training
 After model selection, the entire training set is used to train the final sysSVM2 model:
