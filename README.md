@@ -8,7 +8,7 @@ The first part of the method (sysSVM2) requires a cohort of cancer samples. Ther
 1. **Feature mapping**: identify the molecular and systems-level properties of damaged genes in the cohort; mark canonical drivers as a training set
 1. **Model selection**: tune SVM parameters to optimise performance, based on the sensitivity on the training set 
 1. **Training**: train the model with the selected parameters
-1. **Prediction**: predict on new samples/genes, assigning a score to each
+1. **Prediction**: predict on new samples/genes, assigning a score to each.
 
 [//]: # (end list)
 
@@ -19,6 +19,8 @@ TO DO
 
 
 ## Running sysSVM2 on an initial cohort
+In this guide, we assume that users' working directories correspond to a clone of this repository. We also assume that results are output to a directory called ```~/test_sysSVM2```.
+### 1. Feature mapping
 The R functions that execute sysSVM2 are contained in ```train_predict_functions.R```, so first source this file:
 ```
 source("sysSVM_NN/R/train_predict_functions.R")
@@ -29,7 +31,7 @@ molecular_data = read_tsv("sysSVM_NN/example_data/molecular_features_100samples.
 ```
 The required ID columns are
 * ```sample```: Sample identifiers
-* ```entrez```: Gene Entrez IDs
+* ```entrez```: Gene Entrez IDs,
 
 [//]: # (end list)
 
@@ -40,7 +42,7 @@ and the recommended molecular feature columns are
 * ```no_GOF_muts```: Number of gain-of-function/hotspot mutations
 * ```Copy_number```: Total copy number
 * ```CNVGain```: Binary 0/1 indicating gene amplification (recommended copy number > 2 * ploidy)
-* ```CNVLoss```: Binary 0/1 indicating gene loss (recommended copy number <= 1)
+* ```CNVLoss```: Binary 0/1 indicating gene loss (recommended copy number <= 1).
 
 [//]: # (end list)
 
@@ -52,16 +54,43 @@ Finally, join the two tables to create the sysSVM2 input file:
 ```
 sysSVM2_input = inner_join(molecular_data, systemsLevel_data, by = "entrez")
 ```
+### 2. Model selection
 After preparing the input file, separate the training and prediction sets (*i.e.* canonical drivers, and the rest of genes). A list of canonical driver Tumour Suppressor Genes/Oncogenes, along with their respective driver alteration types (Loss/Gain of function) is provided.
 ```
 canonical_drivers = readRDS("sysSVM_NN/example_data/canonical_drivers.rds")
-sysSVM_data = prepare_trainingPrediction(sysSVM2_input, canonical_drivers)
+sysSVM_data = prepare_trainingPrediction(sysSVM2_input, canonical_drivers, output_dir = "~/test_sysSVM2")
 ```
-The next step is model selection, in which SVM parameters are tuned to the training set. First, a grid of parameter combinations is assessed using three-fold cross-validation. This is performed using ```run_crossValidation_par```, which can run in parallel envrionments. We recommend at least 1000 iterations in practice, and this is fairly computationally intensive. After the cross-validation iterations have been run, they are assessed using ```selectParams_from_CVstats```, which identifies the best parameter combinations. 
+The training set is then used to tune SVM model parameters. By default, sysSVM2 performs three-fold Cross-Validation (CV) over a pre-determined grid of parameter combinations. The CV is run for a number of iterations, and since this can be computationally intensive the code is designed to run in a parallel environment. For example, to perform 10 CV iterations using 4 cores, run
+```
+cv_stats = run_crossValidation_par(iters = 10,
+                                   cores = 4, 
+                                   inPath = "~/test_sysSVM2",
+                                   outPath = "~/test_sysSVM2",
+                                   parallelLib = "parallel")
+```
+The ```parallelLib``` argument should be set either to ```"parallel"``` or ```"snow"```, depending on the user's environment. In practice, we recommend using at least 1,000 CV iterations. 
 \
 \
-We can now train the SVMs with selected parameters, with ```train_sysSVM```. The trained model lcan be used to make predictions with ```predict_sysSVM```.
-
+After the CV iterations have been run, their results are assessed to identify the best parameter combinations:
+```
+model_selection = selectParams_from_CVstats(cv_stats, output_dir = test_dir)
+```
+### 3. Training
+After model selection, the entire training set is used to train the final sysSVM2 model:
+```
+trained_sysSVM2 = train_sysSVM2(model_parameters = model_selection$best_model_final, 
+                                training_set = sysSVM_data$training_set, 
+                                output_dir = "~/test_sysSVM2")
+```
+### 4. Prediction
+The trained model can now be used to make predictions, either on the same cohort or on new samples. To use the prediction set from the same cohort used for training:
+```
+predictions = predict_sysSVM2(trained_sysSVM, 
+                              prediction_set = sysSVM_data$prediction_set, 
+                              prediction_set_ns = sysSVM_data$prediction_set_ns, 
+                              output_dir = "~/test_sysSVM2")
+```
+The output is a ranked list of damaged genes in each patient, with high scores/ranks corresponding to putative driver genes.
 
 ## Expanding a cohort with sysSVM2-NN
 Run ```some code.py```
