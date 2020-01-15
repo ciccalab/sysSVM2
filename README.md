@@ -23,9 +23,11 @@ The R functions that execute sysSVM2 are contained in ```train_predict_functions
 ```
 source("sysSVM_NN/R/train_predict_functions.R")
 ```
-\
-\
-The cohort data must be formatted for sysSVM. An example sysSVM2 input file, for a cohort of 100 simulated pan-cancer samples, is provided: ```molecular_data = read_tsv("sysSVM_NN/example_data/molecular_features_100samples.tsv")```. The required ID columns are
+The cohort data must be formatted for sysSVM2. An example sysSVM2 input file, for a cohort of 100 simulated pan-cancer samples, is provided: 
+```
+molecular_data = read_tsv("sysSVM_NN/example_data/molecular_features_100samples.tsv")
+```
+The required ID columns are
 * ```sample```: Sample identifiers
 * ```entrez```: Gene Entrez IDs
 
@@ -42,14 +44,19 @@ and the recommended molecular feature columns are
 
 [//]: # (end list)
 
-To complete the feature mapping of the cohort, the systems-level properties of the genes are also required. A compendium of 25 of these properties, each of which distinguish cancer genes from the rest of human genes, is provided: ```systemsLevel_data = read_tsv("sysSVM_NN/example_data/systemsLevel_features_allGenes.tsv")```. 
-\
-\
-Finally, join the two tables to create the sysSVM2 input file: ```sysSVM2_input = inner_join(molecular_data, systemsLevel_data, by = "entrez")```.
-
-After preparing the input file, further data formatting is done using ```prepare_trainingPrediction```. One of the main purposes of this is to separate the training and prediction sets (*i.e.* canonical drivers, and the rest of genes). 
-\
-\
+To complete the feature mapping of the cohort, the systems-level properties of the genes are also required. A compendium of 25 of these properties, each of which distinguish cancer genes from the rest of human genes, is provided: 
+```
+systemsLevel_data = read_tsv("sysSVM_NN/example_data/systemsLevel_features_allGenes.tsv")
+``` 
+Finally, join the two tables to create the sysSVM2 input file: 
+```
+sysSVM2_input = inner_join(molecular_data, systemsLevel_data, by = "entrez")
+```
+After preparing the input file, separate the training and prediction sets (*i.e.* canonical drivers, and the rest of genes). A list of canonical driver Tumour Suppressor Genes/Oncogenes, along with their respective driver alteration types (Loss/Gain of function) is provided.
+```
+canonical_drivers = readRDS("sysSVM_NN/example_data/canonical_drivers.rds")
+sysSVM_data = prepare_trainingPrediction(sysSVM2_input, canonical_drivers)
+```
 The next step is model selection, in which SVM parameters are tuned to the training set. First, a grid of parameter combinations is assessed using three-fold cross-validation. This is performed using ```run_crossValidation_par```, which can run in parallel envrionments. We recommend at least 1000 iterations in practice, and this is fairly computationally intensive. After the cross-validation iterations have been run, they are assessed using ```selectParams_from_CVstats```, which identifies the best parameter combinations. 
 \
 \
