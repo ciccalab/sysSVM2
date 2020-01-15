@@ -21,6 +21,6 @@ Need to publish first lol
 
 
 ## Acknowledgements
-Thanos Mourikis
-Damjan Temelkovski
+Thanos Mourikis\
+Damjan Temelkovski\
 Christopher Yau
