@@ -10,6 +10,7 @@ The first part of the method (sysSVM2) requires a cohort of cancer samples. Ther
 1. **Training**: train the model with the selected parameters
 1. **Prediction**: predict on new samples/genes, assigning a score to each
 [//]: # (end list)
+
 The second part of the method uses a Neural Network (NN) to incorporate additional training samples to expand the initial sysSVM2 model. This can be useful in settings where new data arrive sporadically, as it saves the user from having to re-train sysSVM2 *de novo*.  
 
 ## Download/installation
