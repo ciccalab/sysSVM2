@@ -8,7 +8,7 @@ The first part of the method (sysSVM2) requires a cohort of cancer samples. Ther
 1. Feature mapping:
 1. Model selection:
 1. Training:
-1. Prediction:
+1. Prediction: \n\n
 \
 \
 The second part of the method uses a Neural Network (NN) to incorporate additional training samples to expand the initial sysSVM2 model.  
