@@ -9,6 +9,7 @@ The first part of the method (sysSVM2) requires a cohort of cancer samples. Ther
 1. **Model selection**: tune SVM parameters to optimise performance, based on the sensitivity on the training set 
 1. **Training**: train the model with the selected parameters
 1. **Prediction**: predict on new samples/genes, assigning a score to each
+
 [//]: # (end list)
 
 The second part of the method uses a Neural Network (NN) to incorporate additional training samples to expand the initial sysSVM2 model. This can be useful in settings where new data arrive sporadically, as it saves the user from having to re-train sysSVM2 *de novo*.  
@@ -24,12 +25,13 @@ In R, first source the file ```train_predict_functions.R```. This contains the f
 The cohort data must be formatted for sysSVM. An example sysSVM2 input file, for a cohort of 100 simulated pan-cancer samples, is provided: ```molecular_data = read_tsv("sysSVM_NN/example_data/molecular_features_100samples.tsv")```. The required ID columns are
 * sample: Sample identifiers
 * entrez: Gene Entrez IDs
+
 [//]: # (end list)
 
 and the recommended molecular feature columns are
-* no_ALL_muts: Total number of mutations in a gene
-* no_NTDam_muts: Number of truncating mutations
-* no_NTDam_muts: Number of non-truncating mutations
+* ```no_ALL_muts```: Total number of mutations in a gene
+* *no_NTDam_muts*: Number of truncating mutations
+* **no_NTDam_muts**: Number of non-truncating mutations
 * no_GOF_muts: Number of gain-of-function/hotspot mutations
 * Copy_number: Total copy number
 * CNVGain: Binary 0/1 indicating gene amplification (recommended copy number > 2 * ploidy)
