@@ -93,12 +93,8 @@ The output is a ranked list of damaged genes in each patient, with high scores/r
 
 ## Expanding a cohort with sysSVM2-NN
 In research and clinical settings, new data often arrive sporadically. To deal with this, we developed a Neural Network (NN) approach to incorporate new samples into a pre-trained sysSVM2 model. sysSVM2-NN is implemented in Python, and uses the Keras API with a Tensorflow backend. 
-\
-\
 ### Input data
 The input files for sysSVM2-NN contain data for an initial cohort (used to train sysSVM2) and an additional cohort. Example input files for an initial cohort of 100 samples, and an additional cohort of 50 samples, are provided in ```sysSVM_NN/example_data```. These files contain the same features used to train sysSVM2, as well as an extra ```score``` column. This should contain the sysSVM2 scores for the initial cohort, and be set to ```NA``` for the additional cohort.
-\
-\
 ### Training
 Our NN approach is termed an Augmented Auto-Encoder (AAE). Like many NNs, the AAE is trained iteratively, with each iteration termed an "epoch". To train the AAE model on the extended cohort for 100 epochs, run the following from the command line:
 ```
@@ -111,7 +107,7 @@ python sysSVM_NN/Python/train_AAE.py --help
 ### Prediction
 Once the AAE model has been trained, it can be used to make predictions in a similar way to sysSVM2. Two outputs of the training, the scaling factors and the trained model itself, are required for this. For example, to make predictions on the additional cohort, run
 ```
-python sysSVM_NN/Python/predict_AAE.py $additional ~/test_sysSVM2-NN/scaling_factors.tsv ~/test_sysSVM2-NN/aae.h5 ~/test_sysSVM2-NN
+python sysSVM_NN/Python/predict_AAE.py $additional ~/test_sysSVM2-NN/scaling_factors.tsv ~/test_sysSVM2-NN/AAE.h5 ~/test_sysSVM2-NN
 ```
 
 ## Reference
