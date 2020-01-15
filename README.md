@@ -1,43 +1,26 @@
-# sysSVM_NN
-New implementation of sysSVM
+# sysSVM2-NN
 
-# This is an <h1> tag
-## This is an <h2> tag
-###### This is an <h6> tag
-
-*This text will be italic*
-_This will also be italic_
-
-**This text will be bold**
-__This will also be bold__
-
-_You **can** combine them_
-
-* Item 1
-* Item 2
-  * Item 2a
-  * Item 2b
+## Description
+sysSMV2-NN is...
 
 
-1. Item 1
-1. Item 2
-1. Item 3
-   1. Item 3a
-   1. Item 3b
+## Download/installation
+I guess it needs to be a package?
 
 
-As Kanye West said:
-
-> We're living the future so
-> the present is our past.
+## Running sysSVM2 on an initial cohort
+Run ```some code.R```
 
 
-I think you should use an
-`<addr>` element here instead.
+## Expanding a cohort with sysSVM2-NN
+Run ```some code.py```
 
 
-```def foo():
-    if not bar:
-        return True
-```
+## Reference
+Need to publish first lol
 
+
+## Acknowledgements
+Thanos Mourikis
+Damjan Temelkovski
+Christopher Yau
