@@ -30,13 +30,15 @@ The cohort data must be formatted for sysSVM. An example sysSVM2 input file, for
 
 and the recommended molecular feature columns are
 * ```no_ALL_muts```: Total number of mutations in a gene
-* *no_NTDam_muts*: Number of truncating mutations
-* **no_NTDam_muts**: Number of non-truncating mutations
-* no_GOF_muts: Number of gain-of-function/hotspot mutations
-* Copy_number: Total copy number
-* CNVGain: Binary 0/1 indicating gene amplification (recommended copy number > 2 * ploidy)
-* CNVLoss: Binary 0/1 indicating gene loss (recommended copy number <= 1)
+* ```no_NTDam_muts```: Number of truncating mutations
+* ```no_NTDam_muts```: Number of non-truncating mutations
+* ```no_GOF_muts```: Number of gain-of-function/hotspot mutations
+* ```Copy_number```: Total copy number
+* ```CNVGain```: Binary 0/1 indicating gene amplification (recommended copy number > 2 * ploidy)
+* ```CNVLoss```: Binary 0/1 indicating gene loss (recommended copy number <= 1)
+
 [//]: # (end list)
+
 To complete the feature mapping of the cohort, the systems-level properties of the genes are also required. A compendium of 25 of these properties, each of which distinguish cancer genes from the rest of human genes, is provided: ```systemsLevel_data = read_tsv("sysSVM_NN/example_data/systemsLevel_features_allGenes.tsv")```. 
 \
 \
