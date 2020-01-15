@@ -76,7 +76,7 @@ tf.compat.v1.keras.backend.set_session(sess)
 
 # Load data
 print("Reading input from", args.input_file)
-features_df = pd.read_csv(args.input_file, sep = "\t", index_col = "id")
+features_df = pd.read_csv(args.input_file, sep = "\t", index_col = ["sample", "entrez"])
 
 
 # Scale data
