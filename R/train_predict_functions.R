@@ -575,7 +575,7 @@ train_sysSVM2 = function(model_parameters, training_set, output_dir = NULL){
 
 
 # Use a trained sysSVM model to score alterations
-predict_sysSVM = function(trained_sysSVM, prediction_set, prediction_set_ns, sample_gene_sep = "__", output_dir = NULL){
+predict_sysSVM2 = function(trained_sysSVM, prediction_set, prediction_set_ns, sample_gene_sep = "__", output_dir = NULL){
   
   require(tidyr)
   require(dplyr)
