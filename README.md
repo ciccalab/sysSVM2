@@ -5,17 +5,15 @@ sysSMV2-NN is a computational tool for patient-specific cancer driver gene prior
 \
 \
 The first part of the method (sysSVM2) requires a cohort of cancer samples. There are four broad steps to the algorithm: 
-1. Feature mapping:
-1. Model selection:
-1. Training:
-1. Prediction:
+1. Feature mapping: identify the molecular and systems-level properties of damaged genes in the cohort; mark canonical drivers as a training set
+1. Model selection: tune SVM parameters to optimise performance, based on the sensitivity on the training set 
+1. Training: train the model with the selected parameters
+1. Prediction: predict on new samples/genes, assigning a score to each
 <a/>
-\
-\
-The second part of the method uses a Neural Network (NN) to incorporate additional training samples to expand the initial sysSVM2 model.  
+The second part of the method uses a Neural Network (NN) to incorporate additional training samples to expand the initial sysSVM2 model. This can be useful in settings where new data arrive sporadically, as it saves the user from having to re-train sysSVM2 *de novo*.  
 
 ## Download/installation
-I guess it needs to be a package?
+TO DO
 
 
 ## Running sysSVM2 on an initial cohort
@@ -27,7 +25,7 @@ Run ```some code.py```
 
 
 ## Reference
-Need to publish first lol
+TO DO
 
 
 ## Acknowledgements
