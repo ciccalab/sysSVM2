@@ -15,8 +15,7 @@ The first part of the method (sysSVM2) requires a cohort of cancer samples. Ther
 The second part of the method uses a Neural Network (NN) to incorporate additional training samples to expand the initial sysSVM2 model. This can be useful in settings where new data arrive sporadically, as it saves the user from having to re-train sysSVM2 *de novo*.  
 
 ## Download/installation
-TO DO
-
+To download sysSVM2-NN, clone this repository.
 
 ## Running sysSVM2 on an initial cohort
 In this guide, we assume that the user's working directory corresponds to a clone of this repository. We also assume that results are output to a directory called ```~/test_sysSVM2-NN```. sysSVM2 is implemented in R, and the functions to execute it are contained in ```train_predict_functions.R```, so source this file before proceeding:
@@ -94,7 +93,7 @@ The output is a ranked list of damaged genes in each patient, with high scores/r
 ## Expanding a cohort with sysSVM2-NN
 In research and clinical settings, new data often arrive sporadically. To deal with this, we developed a Neural Network (NN) approach to incorporate new samples into a pre-trained sysSVM2 model. sysSVM2-NN is implemented in Python, and uses the Keras API with a Tensorflow backend. 
 ### Input data
-The input files for sysSVM2-NN contain data for an initial cohort (used to train sysSVM2) and an additional cohort. Example input files for an initial cohort of 100 samples, and an additional cohort of 50 samples, are provided in ```sysSVM_NN/example_data```. These files contain the same features used to train sysSVM2, as well as an extra ```score``` column. This should contain the sysSVM2 scores for the initial cohort, and be set to ```NA``` for the additional cohort.
+The input files for sysSVM2-NN contain data for an initial cohort (used to train sysSVM2) and an additional cohort. Example input files for an initial cohort of 100 samples, and an additional cohort of 50 samples, are provided in ```sysSVM_NN/example_data```, called ```NN_input_inital.tsv``` and ```NN_input_additional.tsv``` respectively. These files contain the same features used to train sysSVM2, as well as an extra ```score``` column. This column should contain the sysSVM2 scores for the initial cohort, and be set to ```NA``` for the additional cohort.
 ### Training
 Our NN approach is termed an Augmented Auto-Encoder (AAE). Like many NNs, the AAE is trained iteratively, with each iteration termed an "epoch". To train the AAE model on the extended cohort for 100 epochs, run the following from the command line:
 ```
@@ -105,7 +104,7 @@ where ```$initial``` and ```$additional``` are the input file names for each coh
 python sysSVM_NN/Python/train_AAE.py --help
 ```
 ### Prediction
-Once the AAE model has been trained, it can be used to make predictions in a similar way to sysSVM2. Two outputs of the training, the scaling factors and the trained model itself, are required for this. For example, to make predictions on the additional cohort, run
+Once the expanded AAE model has been trained, it can be used to make predictions in a similar way to sysSVM2. Two outputs of the training, the scaling factors and the trained model itself, are required for this. For example, to make predictions on the additional cohort, run
 ```
 python sysSVM_NN/Python/predict_AAE.py $additional ~/test_sysSVM2-NN/scaling_factors.tsv ~/test_sysSVM2-NN/AAE.h5 ~/test_sysSVM2-NN
 ```
