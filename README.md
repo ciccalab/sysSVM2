@@ -19,12 +19,15 @@ TO DO
 
 
 ## Running sysSVM2 on an initial cohort
-In R, first source the file ```train_predict_functions.R```. This contains the functions that execute sysSVM2. 
+The R functions that execute sysSVM2 are contained in ```train_predict_functions.R```, so first source this file:
+```
+source("sysSVM_NN/R/train_predict_functions.R")
+```
 \
 \
 The cohort data must be formatted for sysSVM. An example sysSVM2 input file, for a cohort of 100 simulated pan-cancer samples, is provided: ```molecular_data = read_tsv("sysSVM_NN/example_data/molecular_features_100samples.tsv")```. The required ID columns are
-* sample: Sample identifiers
-* entrez: Gene Entrez IDs
+* ```sample```: Sample identifiers
+* ```entrez```: Gene Entrez IDs
 
 [//]: # (end list)
 
