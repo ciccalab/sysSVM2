@@ -128,7 +128,7 @@ print("Reading input data from", args.input_files)
 input_files = args.input_files.split(",")
 features_scores_df_list = []
 for input_file in input_files:
-    features_scores_df_list.append(pd.read_csv(input_file, sep = "\t", index_col = "id"))
+    features_scores_df_list.append(pd.read_csv(input_file, sep = "\t", index_col = ["sample", "entrez"]))
 # features_scores_df = pd.read_csv(args.input_file, sep = "\t", index_col = "id")
 features_scores_df = pd.concat(features_scores_df_list)
 
