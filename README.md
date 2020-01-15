@@ -20,6 +20,23 @@ TO DO
 In R, first source the file ```train_predict_functions.R```. This contains the functions that execute sysSVM2. 
 \
 \
+The cohort data must be formatted for sysSVM. An example sysSVM2 input file, for a cohort of 100 simulated pan-cancer samples, is provided: ```molecular_data = read_tsv("sysSVM_NN/example_data/molecular_features_100samples.tsv")```. The required ID columns are
+* sample: Sample identifiers
+* entrez: Gene Entrez IDs
+and the recommended molecular feature columns are
+* no_ALL_muts: Total number of mutations in a gene
+* no_NTDam_muts: Number of truncating mutations
+* no_NTDam_muts: Number of non-truncating mutations
+* no_GOF_muts: Number of gain-of-function/hotspot mutations
+* Copy_number: Total copy number
+* CNVGain: Binary 0/1 indicating gene amplification (recommended copy number > 2 * ploidy)
+* CNVLoss: Binary 0/1 indicating gene loss (recommended copy number <= 1)
+<a/>
+To complete the feature mapping of the cohort, the systems-level properties of the genes are also required. A compendium of 25 of these properties, each of which distinguish cancer genes from the rest of human genes, is provided: ```systemsLevel_data = read_tsv("sysSVM_NN/example_data/systemsLevel_features_allGenes.tsv")```. 
+\
+\
+Finally, join the two tables to create the sysSVM2 input file: ```sysSVM2_input = inner_join(molecular_data, systemsLevel_data, by = "entrez")```.
+
 After preparing the input file, further data formatting is done using ```prepare_trainingPrediction```. One of the main purposes of this is to separate the training and prediction sets (*i.e.* canonical drivers, and the rest of genes). 
 \
 \
