@@ -508,7 +508,7 @@ selectParams_from_CVstats = function(cv_stats, output_dir = NULL){ #step = NULL,
 
 
 # Given kernel parameters (i.e. best models), train on true positives
-train_sysSVM = function(model_parameters, training_set, output_dir = NULL){
+train_sysSVM2 = function(model_parameters, training_set, output_dir = NULL){
   
   require(readr)
   require(dplyr)
