@@ -599,8 +599,8 @@ predict_sysSVM2 = function(trained_sysSVM, prediction_set, prediction_set_ns, sa
     scored_data[[paste(k, "decision_value", sep = "_")]] = as.numeric(attr(dv, "decision.values"))
     
     
-    # Sensitivity weighting
-    BMS_i = trained_sysSVM[[k]]$sensitivity_mean / trained_sysSVM[[k]]$sensitivity_var
+    # Sensitivity weighting - JN 18/02/20: don't divide by the sensitivity variance
+    BMS_i = trained_sysSVM[[k]]$sensitivity_mean #/ trained_sysSVM[[k]]$sensitivity_var 
     
     
     # Score contribution
