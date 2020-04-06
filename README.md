@@ -56,7 +56,9 @@ After preparing the input file, the next step is to separate the training and pr
 canonical_drivers = readRDS("example_data/canonical_drivers.rds")
 sysSVM_data = prepare_trainingPrediction(sysSVM2_input, canonical_drivers, output_dir = "~/test_sysSVM2-NN")
 ```
-The training set is then used to tune SVM model parameters. By default, sysSVM2 performs three-fold Cross-Validation (CV) over a pre-determined grid of parameter combinations. The CV is run for a number of iterations, and since this can be computationally intensive, the code is designed to run in a parallel environment. For example, to perform 10 CV iterations using 4 cores, run
+SVM model parameters then need to be tuned. sysSVM2 does this automatically, using three-fold Cross-Validation (CV) over a pre-determined grid of parameter combinations. However, this is a computationally intensive process. If sufficient computational resources are not available, or if users want to train a model on a similar dataset to one for which they have already carried out CV iterations, we suggest that kernel parameters can be 're-used' to save on computation time.  
+\
+To run the CV iterations as efficiently as possible, the code is designed to run in a parallel environment. For example, to perform 10 CV iterations using 4 cores, run
 ```
 cv_stats = run_crossValidation_par(iters = 10,
                                    cores = 4, 
@@ -64,7 +66,7 @@ cv_stats = run_crossValidation_par(iters = 10,
                                    outPath = "~/test_sysSVM2-NN",
                                    parallelLib = "parallel")
 ```
-The ```parallelLib``` argument should be set to either ```"parallel"``` or ```"snow"```, depending on the user's environment. In practice, we recommend using at least 1,000 CV iterations. 
+The ```parallelLib``` argument should be set to either ```"parallel"``` or ```"snow"```, depending on the user's environment. In practice, we recommend using at least 1,000 CV iterations to ensure convergence of parameter selections. 
 \
 \
 After the CV iterations have been run, their results are assessed to identify the best parameter combinations:
