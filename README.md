@@ -20,12 +20,12 @@ To download sysSVM2-NN, clone this repository.
 ## Running sysSVM2 on an initial cohort
 In this guide, we assume that the user's working directory corresponds to a clone of this repository. We also assume that results are output to a directory called ```~/test_sysSVM2-NN```. sysSVM2 is implemented in R, and the functions to execute it are contained in ```train_predict_functions.R```, so source this file before proceeding:
 ```
-source("sysSVM_NN/R/train_predict_functions.R")
+source("R/train_predict_functions.R")
 ```
 ### 1. Feature mapping
 The cohort data must first be formatted for sysSVM2. An example sysSVM2 input file, for a cohort of 100 simulated pan-cancer samples, is provided: 
 ```
-molecular_data = read_tsv("sysSVM_NN/example_data/molecular_features_100samples.tsv")
+molecular_data = read_tsv("example_data/molecular_features_100samples.tsv")
 ```
 The required ID columns are
 * ```sample```: Sample identifiers
@@ -46,7 +46,7 @@ and the recommended molecular feature columns are
 
 To complete the feature mapping of the cohort, the systems-level properties of the genes are also required. A compendium of 25 of these properties, each of which distinguish cancer genes from the rest of human genes, is provided: 
 ```
-systemsLevel_data = read_tsv("sysSVM_NN/example_data/systemsLevel_features_allGenes.tsv")
+systemsLevel_data = read_tsv("example_data/systemsLevel_features_allGenes.tsv")
 ``` 
 Finally, join the two tables to create the sysSVM2 input file: 
 ```
@@ -55,7 +55,7 @@ sysSVM2_input = inner_join(molecular_data, systemsLevel_data, by = "entrez")
 ### 2. Model selection
 After preparing the input file, the next step is to separate the training and prediction sets (*i.e.* canonical drivers, and the rest of genes), and perform data normalisation. A list of canonical driver genes (tumour suppressor genes/oncogenes), along with their respective driver alteration types (loss/gain of function) is provided. By default, sysSVM2 scales numeric features to have unit standard deviation.
 ```
-canonical_drivers = readRDS("sysSVM_NN/example_data/canonical_drivers.rds")
+canonical_drivers = readRDS("example_data/canonical_drivers.rds")
 sysSVM_data = prepare_trainingPrediction(sysSVM2_input, canonical_drivers, output_dir = "~/test_sysSVM2-NN")
 ```
 The training set is then used to tune SVM model parameters. By default, sysSVM2 performs three-fold Cross-Validation (CV) over a pre-determined grid of parameter combinations. The CV is run for a number of iterations, and since this can be computationally intensive, the code is designed to run in a parallel environment. For example, to perform 10 CV iterations using 4 cores, run
