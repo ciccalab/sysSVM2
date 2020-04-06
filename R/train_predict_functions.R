@@ -31,22 +31,49 @@ mark_truePositives = function(df, truePositive_drivers){
 
 
 # Scale data
-get_scaledTable = function(df, scaling_factors = NULL, scaleMean = F){
+get_scaledTable = function(df, scaling_factors = NULL, 
+                           mean_center = c("all", "none", "training", "prediction"),
+                           sd_scale = c("all", "none", "training", "prediction")){
   
   # If scaling_factors are not provided (i.e. we are training rather than predicting), we need to determine them first
   if (is.null(scaling_factors)){
-    # Only scale numeric features
-    factorCols = names(which(sapply(df, function(x) class(x)=="factor")))
-    cols_toScale = setdiff(colnames(df), c("sample", "entrez", factorCols))
     
-    # Calculate mean and standard deviation
-    scaling_factors = list()
-    for (col in cols_toScale){
-      scaling_factors[[col]] = c(
-        mean_translation = ifelse(scaleMean, mean(df[[col]]), 0), # Will only translate for zero mean if scaleMean = TRUE
-        sd_scaling = sd(df[[col]])
-      )
+    
+    # Only scale numeric features, but obviously not the sample/entrez columns if these are numeric!
+    cols_toScale = setdiff(names(which(sapply(df, function(x) class(x) %in% c("numeric", "integer")))), c("sample", "entrez"))
+    
+    
+    # Calculate mean centering factors
+    mean_center = match.arg(mean_center)
+    if (mean_center == "all"){
+      m = apply(df %>% select(cols_toScale), 2, mean)
+    } else if (mean_center == "none"){
+      m = rep(0, length(cols_toScale))
+      names(m) = cols_toScale
+    } else if (mean_center == "training"){
+      m = apply(df %>% subset(type == "TP") %>% select(cols_toScale), 2, mean)
+    } else if (mean_center == "prediction"){
+      m = apply(df %>% subset(type == "prediction") %>% select(cols_toScale), 2, mean)
     }
+    
+    
+    # Calculate SD scaling factors
+    sd_scale = match.arg(sd_scale)
+    if (sd_scale == "all"){
+      s = apply(df %>% select(cols_toScale), 2, sd)
+    } else if (sd_scale == "none"){
+      s = rep(1, length(cols_toScale))
+      names(s) = cols_toScale
+    } else if (sd_scale == "training"){
+      s = apply(df %>% subset(type == "TP") %>% select(cols_toScale), 2, sd)
+    } else if (sd_scale == "prediction"){
+      s = apply(df %>% subset(type == "prediction") %>% select(cols_toScale), 2, sd)
+    }
+    
+    
+    # Compile into single list
+    scaling_factors = list()
+    for (col in cols_toScale) scaling_factors[[col]] = c(mean_translation = unname(m[col]), sd_scaling = unname(s[col]))
   }
   
   
@@ -63,22 +90,32 @@ get_scaledTable = function(df, scaling_factors = NULL, scaleMean = F){
 
 
 # Prepare training and prediction sets
-prepare_trainingPrediction = function(path = NULL,
-                                      create_newDirectory = T,
-                                      cohort_data,
-                                      sample_gene_sep = "__",
-                                      normalTissue_expressionData = NULL,
-                                      normalTissue_name = NULL,
-                                      exclude_features = NULL,
-                                      nonFactor_features = c("sample", "entrez", "no_ALL_muts", "no_NSI_muts", "no_NTDam_muts", "no_TRUNC_muts", "no_GOF_muts", "BND", "INV", "INS"),
-                                      truePositive_drivers,
-                                      damaging_subsetCond = "no_TRUNC_muts + no_NTDam_muts + no_GOF_muts > 0 | CNVGain == 1 | Copy_number == 0",
-                                      scaleMean = F){
+prepare_trainingPrediction = function(# Data
+  cohort_data,
+  truePositive_drivers,
+  output_dir = NULL,
+  # Exclude observations/features
+  exclude_features = NULL,
+  damaging_subsetCond = "no_TRUNC_muts + no_NTDam_muts + no_GOF_muts > 0 | CNVGain == 1 | Copy_number == 0",
+  normalTissue_expressionData = NULL,
+  normalTissue_name = NULL,
+  # Scaling
+  factorise_twoLevel = T,
+  nonFactor_features = c("sample", "entrez", "no_ALL_muts", "no_NSI_muts", "no_NTDam_muts", "no_TRUNC_muts", "no_GOF_muts", "BND", "INV", "INS"),
+  mean_center = c("all", "none", "training", "prediction"),
+  sd_scale = c("all", "none", "training", "prediction"),
+  # Housekeeping
+  sample_gene_sep = "__"
+){
   
   require(tibble)
   require(tidyr)
   require(dplyr)
   cat("Preparing training and prediction sets\n")
+  
+  
+  # Load cohort_data if provided as a file name
+  if (is.character(cohort_data)) cohort_data = readRDS(cohort_data)
   df = cohort_data
   
   
@@ -100,14 +137,6 @@ prepare_trainingPrediction = function(path = NULL,
   if (!is.null(exclude_features)) cat("Excluding features:", paste(exclude_features, collapse = ", "), "\n")
   features = setdiff(colnames(df), exclude_features)
   df = df %>% select(one_of(c("sample", "entrez", features)))
-
-  
-  # Convert features with only two unique values to factors, unless otherwise specified
-  # These features will not undergo any scaling
-  twoLevel_cols = names(which(sapply(df, function(x) n_distinct(x) == 2)))
-  factorCols = setdiff(twoLevel_cols, nonFactor_features)
-  cat("Converting binary features to factors:", paste(factorCols, collapse = ", "), "\n")
-  for (col in factorCols) df[[col]] = factor(df[[col]])
   
   
   # Remove all alterations that are not determined to be damaging, unless damaging_subsetCond is null
@@ -118,30 +147,34 @@ prepare_trainingPrediction = function(path = NULL,
   }
   
   
-  # Scale data
-  if (scaleMean){
-    cat("Scaling data; mean and standard deviation\n")
-  } else {
-    cat("Scaling data; standard deviation only\n")
+  # Mark which alterations are "true positive" drivers, and separate into training and prediction sets
+  # Make sure that any gene included in the training set (no matter what alteration types) is not in the prediction set
+  cat("Separating training and prediction sets\n")
+  df = mark_truePositives(df = df, truePositive_drivers = truePositive_drivers)
+  
+  
+  # Convert features with only two unique values to factors, unless otherwise specified
+  # These features will not undergo any scaling
+  if (factorise_twoLevel){
+    twoLevel_cols = names(which(sapply(df, function(x) n_distinct(x) == 2)))
+    factorCols = setdiff(twoLevel_cols, nonFactor_features)
+    cat("Converting binary features to factors:", paste(factorCols, collapse = ", "), "\n")
+    for (col in factorCols) df[[col]] = factor(df[[col]])
   }
-  scaled = get_scaledTable(df = df, scaleMean = scaleMean)
-  df_scaled = scaled$df_scaled
-  scaling_factors = scaled$scaling_factors
-  rm(scaled)
   
   
+  # Scale data
+  scaling_res = get_scaledTable(df = df, mean_center = mean_center, sd_scale = sd_scale)
+  df_scaled = scaling_res$df_scaled
+  scaling_factors = scaling_res$scaling_factors
+  
+  
+  # Remove sample and entrez columns, instead use sample__entrez as row name
   # Function to remove row names from a data frame; sometimes column_to_rownames doesn't work otherwise
   unrowname = function(x){
     rownames(x) = c()
     return(x)
   }
-  
-  
-  # Mark which alterations are "true positive" drivers, and separate into training and prediction sets
-  # Make sure that any gene included in the training set (no matter what alteration types) is not in the prediction set
-  cat("Separating training and prediction sets\n")
-  df = mark_truePositives(df = df, truePositive_drivers = truePositive_drivers)
-  df_scaled$type = df$type
   # Unscaled data
   df = df %>% 
     subset(!(type == "prediction" & entrez %in% truePositive_drivers$entrez)) %>%
@@ -161,12 +194,20 @@ prepare_trainingPrediction = function(path = NULL,
   
   
   # Save scaling factors, training and prediction sets
-  if (create_newDirectory) dir.create(path)
-  saveRDS(scaling_factors, file = paste(path, "scaling_factors.rds", sep = "/"))
-  saveRDS(training, file = paste(path, "training_set.rds", sep = "/"))
-  saveRDS(training_ns, file = paste(path, "training_set_noScale.rds", sep = "/"))
-  saveRDS(prediction, file = paste(path, "prediction_set.rds", sep = "/"))
-  saveRDS(prediction_ns, file = paste(path, "prediction_set_noScale.rds", sep = "/"))
+  if (!is.null(output_dir)){
+    if (!dir.exists(output_dir)) dir.create(output_dir)
+    saveRDS(scaling_factors, file = paste(output_dir, "scaling_factors.rds", sep = "/"))
+    saveRDS(training, file = paste(output_dir, "training_set.rds", sep = "/"))
+    saveRDS(training_ns, file = paste(output_dir, "training_set_noScale.rds", sep = "/"))
+    saveRDS(prediction, file = paste(output_dir, "prediction_set.rds", sep = "/"))
+    saveRDS(prediction_ns, file = paste(output_dir, "prediction_set_noScale.rds", sep = "/"))
+  }
+  
+  
+  # Output
+  return(list(scaling_factors = scaling_factors, 
+              training_set = training, training_set_ns = training_ns,
+              prediction_set = prediction, prediction_set_ns = prediction_ns))
   cat("Dataset divided into", nrow(training), "training observations and", nrow(prediction), "observations for prediction\n")
 }
 
@@ -190,7 +231,7 @@ run_crossValidation_par = function(inPath,
                                    sample_gene_sep = "__",
                                    verbose = F,
                                    parallelLib = "snow"
-                                   ){
+){
   
   require(parallel)
   require(snow)
@@ -199,10 +240,6 @@ run_crossValidation_par = function(inPath,
   require(dplyr)
   require(e1071)
   cat("Beginning cross-validation for hyperparameter tuning\n")
-  
-  
-  # If not specified, save output to the same place where input is read from
-  if (is.null(outPath)) outPath = inPath
   
   
   ##---- Sort out directory structure for verbose mode ----
@@ -302,7 +339,7 @@ run_crossValidation_par = function(inPath,
       if (k == "polynomial") warning("You have not specified a grid range for degree Fixing at ", degreeDefault)
       params_iterations$degree = degreeDefault
     }
-
+    
     
     # Set up parallel environment, including progress bar
     n_tasks = nrow(params_iterations)
@@ -350,7 +387,7 @@ run_crossValidation_par = function(inPath,
         
         
         ##---- Separate training and test sets ----
-      
+        
         # Choose which true positive genes to use for training, and which to use to test the sensitivity
         # This is leave-one-out cross-validation based on the unique genes rather than the rows of the full training set
         traingenes = base::sample(truePositive_genes, size = ceiling( (folds-1)/folds * length(truePositive_genes) ))
@@ -361,7 +398,7 @@ run_crossValidation_par = function(inPath,
         trainset = truePositives %>% filter(sapply(rownames(.), function(key) strsplit(key, split = sample_gene_sep)[[1]][2]) %in% traingenes)
         testset = truePositives %>% filter(!sapply(rownames(.), function(key) strsplit(key, split = sample_gene_sep)[[1]][2]) %in% traingenes)
         
-
+        
         # Save the trainset and testset (verbose mode only)
         if (verbose){
           saveRDS(trainset, file = paste(iteration_dir, "trainset.rds", sep = "/"))
@@ -418,9 +455,13 @@ run_crossValidation_par = function(inPath,
   
   
   # Write cv_stats to file
-  cv_stats_fn = paste(outPath, "cv_stats.tsv", sep="/")
-  write_tsv(cv_stats_full, path = cv_stats_fn)
-  cat("CV results written to", cv_stats_fn, "\n")
+  if (!is.null(outPath)){
+    cv_stats_fn = paste(outPath, "cv_stats.tsv", sep="/")
+    write_tsv(cv_stats_full, path = cv_stats_fn)
+    cat("CV results written to", cv_stats_fn, "\n")
+  }
+  
+  return(cv_stats_full)
 }
 
 
@@ -578,9 +619,10 @@ train_sysSVM2 = function(model_parameters, training_set, output_dir = NULL){
 predict_sysSVM2 = function(trained_sysSVM, prediction_set, prediction_set_ns, sample_gene_sep = "__", output_dir = NULL){
   
   require(tidyr)
+  require(tibble)
   require(dplyr)
   require(e1071)
- 
+  
   
   # Load trained model and prediction set if not provided directly
   if (is.character(trained_sysSVM)) trained_sysSVM = readRDS(trained_sysSVM)
@@ -599,8 +641,8 @@ predict_sysSVM2 = function(trained_sysSVM, prediction_set, prediction_set_ns, sa
     scored_data[[paste(k, "decision_value", sep = "_")]] = as.numeric(attr(dv, "decision.values"))
     
     
-    # Sensitivity weighting - JN 18/02/20: don't divide by the sensitivity variance
-    BMS_i = trained_sysSVM[[k]]$sensitivity_mean #/ trained_sysSVM[[k]]$sensitivity_var 
+    # Sensitivity weighting
+    BMS_i = trained_sysSVM[[k]]$sensitivity_mean #/ trained_sysSVM[[k]]$sensitivity_var
     
     
     # Score contribution
@@ -643,6 +685,72 @@ predict_sysSVM2 = function(trained_sysSVM, prediction_set, prediction_set_ns, sa
   # Output
   return(scored_data)
 }
+
+
+
+
+
+# Get lists of predicted drivers for each sample, by topping up canonical drivers with high-scored predictions
+topUp_drivers = function(all_genes, gene_scores, canonical_drivers, n_drivers_per_sample = 5, output_dir = NULL, sample_gene_sep = "__"){
+  
+  require(tidyr)
+  require(tibble)
+  require(dplyr)
+  
+  
+  # Extract list of all damaged genes from list object
+  all_genes = rbind(all_genes$training_set_ns %>% select(-type), all_genes$prediction_set_ns) %>%
+    rownames_to_column("id") %>%
+    separate(id, into = c("sample", "entrez"), sep = sample_gene_sep) %>%
+    mutate(entrez = as.numeric(entrez)) %>%
+    select(sample, entrez)
+  
+  
+  # For gene_scores, require sample, entrez, and score columns
+  gene_scores = gene_scores %>% select(sample, entrez, score)
+  
+  
+  # Join together - some scores may be missing, e.g. for genes in the training set
+  all_scores = left_join(all_genes, gene_scores, by = c("sample", "entrez"))
+  
+  
+  # For canonical drivers, can use either
+  #  1. A vector of Entrez IDs
+  #  2. A data frame with an entrez column
+  #  3. A list of Entrez IDs
+  # Convert whatever is provided into a vector
+  if (is.data.frame(canonical_drivers)){
+    canonical_drivers = canonical_drivers %>% pull(entrez)
+  } else if (is.list(canonical_drivers)){
+    canonical_drivers = unlist(canonical_drivers)
+  }
+  if (!is.numeric(canonical_drivers)) stop("Provided canonical_drivers must be numeric entrez IDs")
+  
+  
+  # Annotate all_scores with canonical driver statuses
+  all_scores = all_scores %>% mutate(canonical_driver = entrez %in% canonical_drivers) %>% arrange(sample, desc(score))
+  
+  
+  # Top-up procedure
+  topUp = all_scores %>%
+    subset(canonical_driver | !is.na(score)) %>%
+    group_by(sample) %>%
+    mutate(n_canonical_thisSample = sum(canonical_driver),
+           n_topUp_thisSample = max(0, n_drivers_per_sample - n_canonical_thisSample),
+           rank = rank(-score, na.last = "keep")) %>%
+    ungroup %>%
+    subset(canonical_driver | rank <= n_topUp_thisSample)
+  
+  
+  # Save
+  if (!is.null(output_dir)) saveRDS(topUp, paste(output_dir, "drivers_toppedUp.rds", sep = "/"))
+  
+  
+  # Output
+  return(topUp)
+}
+
+
 
 
 
