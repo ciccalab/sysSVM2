@@ -1,18 +1,16 @@
-# sysSVM2-NN
+# sysSVM2
 
 ## Description
-sysSMV2-NN is a computational tool for patient-specific cancer driver gene prioritisation. It is based on the principle that driver genes are characterised by particular molecular properties (*e.g.* mutations, copy number variants) and systems-level properties (*e.g.* evolutionary origin, breadth of expression). It works by identifying genes with similar properties to canonical drivers.
+sysSMV2 is a computational tool for patient-specific cancer driver gene prioritisation. It is based on the principle that driver genes are characterised by particular molecular properties (*e.g.* mutations, copy number variants) and systems-level properties (*e.g.* evolutionary origin, breadth of expression). It works by identifying genes with similar properties to canonical drivers.
 \
 \
-The first part of the method (sysSVM2) requires a cohort of cancer samples. There are four broad steps to the algorithm: 
+sysSVM2 requires a cohort of cancer samples. There are four broad steps to the algorithm: 
 1. **Feature mapping**: identify the molecular and systems-level properties of damaged genes in the cohort; mark canonical drivers as a training set
 1. **Model selection**: tune SVM parameters to optimise performance, based on the sensitivity on the training set 
 1. **Training**: train the model with the selected parameters
-1. **Prediction**: predict on new samples/genes, assigning a score to each.
+1. **Prediction**: predict on new samples/genes, assigning a score to each. If necessary, extract a list of the canonical drivers in each sample, 'topped up' with the highest-scoring predictions from the algorithm.
 
 [//]: # (end list)
-
-The second part of the method uses a Neural Network (NN) to incorporate additional training samples to expand the initial sysSVM2 model. This can be useful in settings where new data arrive sporadically, as it saves the user from having to re-train sysSVM2 *de novo*.  
 
 ## Download/installation
 To download sysSVM2-NN, clone this repository.
@@ -89,25 +87,17 @@ predictions = predict_sysSVM2(trained_sysSVM,
                               output_dir = "~/test_sysSVM2-NN")
 ```
 The output is a ranked list of damaged genes in each patient, with high scores/ranks corresponding to putative driver genes. Using the above code, it will also be saved in a file called ```scores.rds```.
+\
+It may be desirable to extract a list of predicted drivers in each sample, rather than a scored/rankded list of all damaged genes. This can be achieved using a 'top-up' procedure, in which (1) all canonical drivers are considered to be predicted drivers, and (2) the highest-scored predictions from sysSVM2 are used to top up the predictions in each sample, up to a specified minimum number of genes per sample. In this example, we can obtain lists of at least five predicted drivers per sample as follows:
+```
+drivers_toppedUp = topUp_drivers(all_genes = sysSVM_data,
+                                 gene_scores = predictions,
+                                 canonical_drivers = canonical_drivers,
+                                 n_drivers_per_sample = 5,
+                                 output_dir = "~/test_sysSVM2-NN")
+```
+The output will be saved in a file called ```drivers_toppedUp.rds```.
 
-## Expanding a cohort with sysSVM2-NN
-In research and clinical settings, new data often arrive sporadically. To deal with this, we developed a Neural Network (NN) approach to incorporate new samples into a pre-trained sysSVM2 model. sysSVM2-NN is implemented in Python, and uses the Keras API with a Tensorflow backend. 
-### Input data
-The input files for sysSVM2-NN contain data for an initial cohort (used to train sysSVM2) and an additional cohort. Example input files for an initial cohort of 100 samples, and an additional cohort of 50 samples, are provided in ```sysSVM_NN/example_data```, called ```NN_input_inital.tsv``` and ```NN_input_additional.tsv``` respectively. These files contain the same features used to train sysSVM2, as well as an extra ```score``` column. This column should contain the sysSVM2 scores for the initial cohort, and be set to ```NA``` for the additional cohort.
-### Training
-Our NN approach is termed an Augmented Auto-Encoder (AAE). Like many NNs, the AAE is trained iteratively, with each iteration termed an "epoch". To train the AAE model on the extended cohort for 100 epochs, run the following from the command line:
-```
-python sysSVM_NN/Python/train_AAE.py $initial,$additional ~/test_sysSVM2-NN --epochs 100
-```
-where ```$initial``` and ```$additional``` are the input file names for each cohort. In practice, we recommend training for at least 1,000 epochs. A full explanation of all the options can be obtained by running
-```
-python sysSVM_NN/Python/train_AAE.py --help
-```
-### Prediction
-Once the expanded AAE model has been trained, it can be used to make predictions in a similar way to sysSVM2. Two outputs of the training, the scaling factors and the trained model itself, are required for this. For example, to make predictions on the additional cohort, run
-```
-python sysSVM_NN/Python/predict_AAE.py $additional ~/test_sysSVM2-NN/scaling_factors.tsv ~/test_sysSVM2-NN/AAE.h5 ~/test_sysSVM2-NN
-```
 
 ## Reference
 TO DO
