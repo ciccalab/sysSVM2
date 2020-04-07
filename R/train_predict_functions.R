@@ -32,7 +32,7 @@ mark_truePositives = function(df, truePositive_drivers){
 
 # Scale data
 get_scaledTable = function(df, scaling_factors = NULL, 
-                           mean_center = c("all", "none", "training", "prediction"),
+                           mean_center = c("none", "all", "training", "prediction"),
                            sd_scale = c("all", "none", "training", "prediction")){
   
   # If scaling_factors are not provided (i.e. we are training rather than predicting), we need to determine them first
@@ -95,14 +95,14 @@ prepare_trainingPrediction = function(# Data
   truePositive_drivers,
   output_dir = NULL,
   # Exclude observations/features
-  exclude_features = NULL,
+  exclude_features = c("no_NSI_muts", "rnaseq_ubiquitous", "protein_low", "ppin_central", "rnaseq_selective", "length_RefSeq", "domains_InterPro", "multiDomain"),
   damaging_subsetCond = "no_TRUNC_muts + no_NTDam_muts + no_GOF_muts > 0 | CNVGain == 1 | Copy_number == 0",
   normalTissue_expressionData = NULL,
   normalTissue_name = NULL,
   # Scaling
   factorise_twoLevel = T,
   nonFactor_features = c("sample", "entrez", "no_ALL_muts", "no_NSI_muts", "no_NTDam_muts", "no_TRUNC_muts", "no_GOF_muts", "BND", "INV", "INS"),
-  mean_center = c("all", "none", "training", "prediction"),
+  mean_center = c("none", "all", "training", "prediction"),
   sd_scale = c("all", "none", "training", "prediction"),
   # Housekeeping
   sample_gene_sep = "__"
