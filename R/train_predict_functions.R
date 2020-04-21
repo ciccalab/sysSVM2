@@ -549,7 +549,12 @@ selectParams_from_CVstats = function(cv_stats, output_dir = NULL){ #step = NULL,
 
 
 # Given kernel parameters (i.e. best models), train on true positives
-train_sysSVM2 = function(model_parameters, training_set, output_dir = NULL){
+# Default values from Table 1 in paper
+train_sysSVM2 = function(model_parameters = list(linear = list(nu = 0.05),
+                                                 polynomial = list(nu = 0.05, degree = 2),
+                                                 radial = list(nu = 0.05, gamma = 2^-7),
+                                                 sigmoid = list(nu = 0.05, gamma = 2)),
+                         training_set, output_dir = NULL){
   
   require(readr)
   require(dplyr)
@@ -559,6 +564,25 @@ train_sysSVM2 = function(model_parameters, training_set, output_dir = NULL){
   # Read model parameters and training data if they weren't provided directly
   if (is.character(model_parameters)) model_parameters = read_tsv(model_parameters)
   if (is.character(training_set)) training_set = readRDS(training_set)
+  
+  
+  # If model parameters are provided as a list, convert to the legacy data frame format
+  if (is.list(model_parameters)){
+    model_parameters_list = model_parameters
+    model_parameters = data.frame()
+    for (k in names(model_parameters_list)){
+      model_parameters = rbind(
+        model_parameters,
+        tibble(
+          kernel = k,
+          nu = ifelse("nu" %in% names(model_parameters_list[[k]]), model_parameters_list[[k]]$nu, 0.05),
+          gamma = ifelse("gamma" %in% names(model_parameters_list[[k]]), model_parameters_list[[k]]$gamma, 1),
+          coef0 = ifelse("coef0" %in% names(model_parameters_list[[k]]), model_parameters_list[[k]]$coef0, 0),
+          degree = ifelse("degree" %in% names(model_parameters_list[[k]]), model_parameters_list[[k]]$degree, 2)
+        )
+      )
+    }
+  }
   
   
   # Train a ocSVM for each kernel in turn
