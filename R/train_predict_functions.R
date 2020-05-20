@@ -760,6 +760,7 @@ topUp_drivers = function(all_genes, gene_scores, canonical_drivers, n_drivers_pe
     subset(canonical_driver | !is.na(score)) %>%
     group_by(sample) %>%
     mutate(n_canonical_thisSample = sum(canonical_driver),
+           less5_flag = n() <= 5,
            n_topUp_thisSample = max(0, n_drivers_per_sample - n_canonical_thisSample),
            rank = rank(-score, na.last = "keep")) %>%
     ungroup %>%
