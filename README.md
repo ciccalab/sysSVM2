@@ -106,8 +106,8 @@ The output will be saved in a file called ```drivers_toppedUp.rds```.
 
 ## Reference
 TO DO
-1. Shoelkopf
-1. Mourikis
+1. B. Shoelkopf, J. Platt, J. Shawe-Taylor, A. Smola and R. Williamson. Estimating the support of a high-dimensional distribution. *Neural Comput.* **13** (2001). 
+
 [//]: # (end list)
 
 
