@@ -59,7 +59,7 @@ After preparing the input file, the next step is to separate the training and pr
 canonical_drivers = readRDS("example_data/canonical_drivers.rds")
 sysSVM_data = prepare_trainingPrediction(sysSVM2_input, canonical_drivers, output_dir = "~/test_sysSVM2")
 ```
-SVM model parameters then need to be tuned. sysSVM2 does this automatically, using three-fold Cross-Validation (CV) over a pre-determined grid of parameter combinations. However, this is a computationally intensive process. If sufficient computational resources are not available, or if users want to train a model on a similar dataset to one for which they have already carried out CV iterations, we suggest that kernel parameters can be 're-used' to save on computation time.  
+SVM model parameters then need to be tuned. sysSVM2 does this automatically, using three-fold Cross-Validation (CV) over a pre-determined grid of parameter combinations. However, this is a computationally intensive process. If sufficient computational resources are not available, the parameters chosen on pan-cancer data, provided in Table 1 of the sysSVM2 publication, can be used. Alternatively, if users want to train a model on a similar dataset to one for which they have already carried out CV iterations, kernel parameters might be 're-used' to save on computation time.  
 \
 To run the CV iterations as efficiently as possible, the code is designed to run in a parallel environment. For example, to perform 10 CV iterations using 4 cores, run
 ```
