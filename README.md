@@ -56,7 +56,7 @@ After formatting the data for sysSVM2, the process of training and prediction ca
 ```
 source("R/train_predict_functions.R")
 ```
-. An example sysSVM2 input file, for a cohort of 100 simulated pan-cancer samples, is provided: 
+An example sysSVM2 input file, for a cohort of 100 simulated pan-cancer samples, is provided: 
 ```
 molecular_data = read_tsv("example_data/molecular_features_100samples.tsv")
 ```
@@ -66,7 +66,7 @@ The required ID columns are
 
 [//]: # (end list)
 
-and the recommended molecular feature columns are
+and the recommended molecular feature columns (produced by ```R/annotation_functions.R```) are
 * ```no_ALL_muts```: Total number of mutations in a gene
 * ```no_NTDam_muts```: Number of truncating mutations
 * ```no_NTDam_muts```: Number of non-truncating mutations
