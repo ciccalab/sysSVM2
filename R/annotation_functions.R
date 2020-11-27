@@ -259,6 +259,7 @@ annotate_cnvs = function(
   # Arguments
   cnv_segments,            # Table with the following columns: sample; chromosome; start; end; and copy_number or segment_mean
   ploidy = NULL,           # Table with the following columns: sample; ploidy. Leave null if unavailable (assumes diploidy)
+  ploidy_threshold = 2,    # Threshold for determining gene amplifications: CN >= ploidy_threshold*ploidy
   gene_coords,             # gene_coords_hg19.tsv or gene_coords_hg38.tsv from the sysSVM2 GitHub repository
   bedtools_bin_dir = NULL, # Directory where the bedtools binary executable is located, if not in $PATH
   temp_dir = tempdir()     # Directory for temporary files to be created
@@ -273,7 +274,7 @@ annotate_cnvs = function(
   # Load data if required
   if (is.character(cnv_segments)) cnv_segments = read_tsv(cnv_segments, col_types = cols())
   if (is.null(ploidy)){
-    warning("No ploidy values provided, assuming diploidy (amplifications will have CN >= 4)")
+    warning(paste0("No ploidy values provided, assuming diploidy (amplifications will have CN >= ", 2*ploidy_threshold, ")"))
     ploidy = data.frame(sample = unique(cnv_segments$sample), ploidy = 2, stringsAsFactors = F) # Assume diploidy in the absence of other data
   } else if (is.character(ploidy)){
     ploidy = read_tsv(ploidy, col_types = cols())
@@ -334,12 +335,12 @@ annotate_cnvs = function(
   
   # Subset for damaging CNVs:
   #  - Overlap a gene with >=25% coverage
-  #  - Either CN<=1 or CN>=2*ploidy
+  #  - Either CN<=1 or CN>=ploidy_threshold*ploidy
   damaging_cnvs = cnv_genes %>%
     subset(overlap_percent >= 25) %>%
     left_join(ploidy, by = "sample") %>%
     mutate(
-      CNVGain = case_when(copy_number >= 2*ploidy ~ 1, T ~ 0),
+      CNVGain = case_when(copy_number >= ploidy_threshold*ploidy ~ 1, T ~ 0),
       CNVLoss = case_when(copy_number <= 1 ~ 1, T ~ 0)
       ) %>%
     subset(CNVGain == 1 | CNVLoss == 1)
@@ -369,9 +370,15 @@ annotate_cnvs = function(
 # Function to combine annotated SSMs and CNVs into a totalTable
 # This contains the molecular properties used by sysSVM2
 make_totalTable = function(
-  ssm_anno, # Output of annotate_ssms()
-  cnv_anno  # Output of annotate_cnvs()
+  ssm_anno,         # Output of annotate_ssms()
+  cnv_anno,         # Output of annotate_cnvs()
+  canonical_drivers # canonical_drivers.rds from the sysSVM2 GitHub repository 
 ){
+  
+  # Make sure we have the correct columns in canonical_drivers
+  if (is.character(canonical_drivers)) canonical_drivers = readRDS(canonical_drivers)
+  canonical_drivers = canonical_drivers %>% select(entrez, geneType)
+  
   
   # Summarise mutations at the level of sample-gene pairs
   sample_gene_muts = ssm_anno %>%
@@ -403,9 +410,20 @@ make_totalTable = function(
     ))
   
   
-  # Subset for damaged genes and output
+  # Subset for damaged genes (including GoF in oncogenes and LoF in TSGs)
   totalTable = totalTable %>% 
-    subset(no_TRUNC_muts + no_NTDam_muts + no_GOF_muts > 0 | Copy_number == 0 | CNVGain == 1)
+    subset(no_TRUNC_muts + no_NTDam_muts + no_GOF_muts > 0 | Copy_number == 0 | CNVGain == 1) %>%
+    left_join(canonical_drivers, by = "entrez") %>%
+    subset(
+      is.na(geneType) |
+        (geneType == "oncogene" & no_NTDam_muts + no_GOF_muts >= 1 | CNVGain == 1) |
+        (geneType == "tumourSuppressor" & no_TRUNC_muts + no_NTDam_muts >= 1 | Copy_number == 0) |
+        (geneType == "TP53" & no_TRUNC_muts + no_NTDam_muts + no_GOF_muts >= 1 | Copy_number == 0)
+    )
+  
+  
+  # Output
+  totalTable = totalTable %>% select(-geneType)
   return(totalTable)
 }
 

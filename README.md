@@ -18,13 +18,45 @@ Users may also train their own sysSVM2 models. Training sysSVM2 requires a cohor
 ## Download/installation
 To download sysSVM2, clone this repository.
 
-## Running sysSVM2 on an initial cohort
-In this guide, we assume that the user's working directory corresponds to a clone of this repository. We also assume that results are output to a directory called ```~/test_sysSVM2```. sysSVM2 is implemented in R, and the functions to execute it are contained in ```train_predict_functions.R```, so source this file before proceeding:
+## Running sysSVM2
+In this guide, we assume that the user's working directory corresponds to a clone of this repository. We also assume that results are output to a directory called ```~/test_sysSVM2```. sysSVM2 is implemented in R.
+
+### 0. Data annotation
+In addition to gene systems-level properties, sysSVM2 uses somatic mutation and CNV data summarised at the gene-level (molecular properties). These gene-level summaries can be produced from standard variant call file formats using the annotation functions provided in this repository. In R, first source these functions:
+```
+source("R/annotation_functions.R")
+```
+Annotation of small somatic mutations (SSMs, *i.e.* SNVs and indels) requires [ANNOVAR](https://doc-openbio.readthedocs.io/projects/annovar/en/latest/) to be installed. A VCF file (aligned to  hg19 in this example) can be converted to annotated SSMs as follows:
+```
+ssms_annotated = annotate_ssms(
+  vcf_fn, annovar_dir, 
+  genome_version = "hg19", 
+  gene_aliases_entrez = "annotation_reference_files/gene_aliases_entrez.tsv", 
+  hotspots = "annotation_reference_files/tcga_pancancer_hotspots_oncodriveclust.tsv"
+)
+```
+Annotation of CNV segments requires [bedtools](https://bedtools.readthedocs.io/en/latest/) to be installed. If available, sample ploidy values can be used to filter copy number gains. To intersect CNV segments with gene coordinates and identify gene gains and losses, run the following:
+```
+cnvs_annotated = annotate_cnvs(
+  cnv_segments, bedtools_bin_dir,
+  ploidy, 
+  gene_coords = "annotation_reference_files/gene_coords_hg19.tsv"
+)
+```
+Finally, the annotated SSMs and CNVs can be combined into a unified format for sysSVM2:
+```
+molecular_data = make_totalTable(
+  ssms_annotated, cnvs_annotated, 
+  canonical_drivers = "example_data/canonical_drivers.rds"
+)
+```
+
+### 1. Feature mapping
+After formatting the data for sysSVM2, the process of training and prediction can begin. First, source the relevant R functions:
 ```
 source("R/train_predict_functions.R")
 ```
-### 1. Feature mapping
-The cohort data must first be formatted for sysSVM2. An example sysSVM2 input file, for a cohort of 100 simulated pan-cancer samples, is provided: 
+. An example sysSVM2 input file, for a cohort of 100 simulated pan-cancer samples, is provided: 
 ```
 molecular_data = read_tsv("example_data/molecular_features_100samples.tsv")
 ```
@@ -106,6 +138,7 @@ The output will be saved in a file called ```drivers_toppedUp.rds```.
 
 ## Reference
 1. B. Shoelkopf, J. Platt, J. Shawe-Taylor, A. Smola and R. Williamson. Estimating the support of a high-dimensional distribution. *Neural Comput.* **13** (2001). 
+2. K. Wang, M. Li, H. Hakonarson. ANNOVAR: Functional annotation of genetic variants from next-generation sequencing data. *Nucleic Acids Research* **38** (2010). [Webpage](https://doc-openbio.readthedocs.io/projects/annovar/en/latest/)
 
 [//]: # (end list)
 
