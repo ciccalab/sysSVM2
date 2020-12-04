@@ -34,7 +34,7 @@ mark_truePositives = function(df, truePositive_drivers){
 get_scaledTable = function(df, scaling_factors = NULL, 
                            mean_center = c("none", "all", "training", "prediction"),
                            sd_scale = c("all", "none", "training", "prediction")){
-  
+
   # If scaling_factors are not provided (i.e. we are training rather than predicting), we need to determine them first
   if (is.null(scaling_factors)){
     
@@ -73,14 +73,24 @@ get_scaledTable = function(df, scaling_factors = NULL,
     
     # Compile into single list
     scaling_factors = list()
-    for (col in cols_toScale) scaling_factors[[col]] = c(mean_translation = unname(m[col]), sd_scaling = unname(s[col]))
+    for (col in setdiff(colnames(df), c("sample", "entrez", "type"))){
+      scaling_factors[[col]] = list(
+        type = class(df[[col]]),
+        scale = col %in% cols_toScale
+      )
+      if (col %in% cols_toScale){
+        scaling_factors[[col]]$factors = c(mean_translation = unname(m[col]), sd_scaling = unname(s[col]))
+      }
+    }
   }
   
   
   # Scale the data
   df_scaled = df
   for (col in names(scaling_factors)){
-    df_scaled[[col]] = (df_scaled[[col]] - scaling_factors[[col]]["mean_translation"]) / scaling_factors[[col]]["sd_scaling"]
+    if (scaling_factors[[col]]$scale){
+      df_scaled[[col]] = (df_scaled[[col]] - scaling_factors[[col]]$factors["mean_translation"]) / scaling_factors[[col]]$factors["sd_scaling"]
+    }
   }
   return(list(df_scaled = df_scaled, scaling_factors = scaling_factors))
 }
@@ -549,12 +559,12 @@ selectParams_from_CVstats = function(cv_stats, output_dir = NULL){ #step = NULL,
 
 
 # Given kernel parameters (i.e. best models), train on true positives
-# Default values from Table 1 in paper
+# Default values from Supplementary Figure 3A in paper
 train_sysSVM2 = function(model_parameters = list(linear = list(nu = 0.05),
                                                  polynomial = list(nu = 0.05, degree = 2),
                                                  radial = list(nu = 0.05, gamma = 2^-7),
                                                  sigmoid = list(nu = 0.05, gamma = 2)),
-                         training_set, output_dir = NULL){
+                         training_set, scaling_factors, output_dir = NULL){
   
   require(readr)
   require(dplyr)
@@ -627,6 +637,10 @@ train_sysSVM2 = function(model_parameters = list(linear = list(nu = 0.05),
   }
   
   
+  # Add scaling factors to saved object
+  trained_sysSVM = list(models = trained_sysSVM, scaling_factors = scaling_factors)
+  
+  
   # Save
   if (!is.null(output_dir)) saveRDS(trained_sysSVM, paste(output_dir, "trained_sysSVM.rds", sep = "/"))
   
@@ -640,7 +654,10 @@ train_sysSVM2 = function(model_parameters = list(linear = list(nu = 0.05),
 
 
 # Use a trained sysSVM model to score alterations
-predict_sysSVM2 = function(trained_sysSVM, prediction_set, prediction_set_ns, sample_gene_sep = "__", output_dir = NULL){
+predict_sysSVM2 = function(trained_sysSVM, 
+                           molecular_data = NULL, systemsLevel_data = "example_data/systemsLevel_features_allGenes.tsv", # For use with pre-trained models
+                           prediction_set = NULL, prediction_set_ns = NULL, # For use with de novo models
+                           sample_gene_sep = "__", output_dir = NULL){
   
   require(tidyr)
   require(tibble)
@@ -648,17 +665,56 @@ predict_sysSVM2 = function(trained_sysSVM, prediction_set, prediction_set_ns, sa
   require(e1071)
   
   
-  # Load trained model and prediction set if not provided directly
+  # Make sure either molecular_data/systemsLevel_data or prediction_set/prediction_set_ns are provided
+  pretrained = !is.null(molecular_data) & !is.null(systemsLevel_data)
+  denovo = !is.null(prediction_set) & !is.null(prediction_set_ns)
+  if (!pretrained & !denovo) stop("Please provide either molecular_data and systemsLevel_data (for pre-trained models), or prediction_set and prediction_set_ns (de novo models)")
+  
+  
+  # Load trained model if not provided directly
   if (is.character(trained_sysSVM)) trained_sysSVM = readRDS(trained_sysSVM)
-  if (is.character(prediction_set)) prediction_set = readRDS(prediction_set)
-  if (is.character(prediction_set_ns)) prediction_set_ns = readRDS(prediction_set_ns)
+  
+  
+  # If molecular_data is provided, scale it
+  if (pretrained){
+    message("Applying pre-trained model")
+    scaling_factors = trained_sysSVM$scaling_factors
+    
+    # Load data if needed
+    if (is.character(molecular_data)) molecular_data = read_tsv(molecular_data, col_types = cols())
+    if (is.character(systemsLevel_data)) systemsLevel_data = read_tsv(systemsLevel_data, col_types = cols())
+    
+    # Join molecular and systems-level data
+    prediction_set_ns = inner_join(molecular_data, systemsLevel_data, by = "entrez")
+    
+    # Select appropriate columns
+    if (length(setdiff(names(scaling_factors), colnames(prediction_set_ns))) > 0){
+      stop(paste0("Missing features: ", paste(setdiff(names(scaling_factors), colnames(prediction_set_ns)), collapse = ", ")))
+    }
+    prediction_set_ns = prediction_set_ns[, c("sample", "entrez", names(scaling_factors))]
+    prediction_set_ns = prediction_set_ns %>% 
+      unite("key", sample, entrez, sep = sample_gene_sep) %>%
+      column_to_rownames("key")
+    
+    # Convert columns to factors where necessary
+    for (col in colnames(prediction_set_ns)){
+      if (scaling_factors[[col]]$type == "factor") prediction_set_ns[[col]] = factor(prediction_set_ns[[col]], levels = c("0", "1"))
+    }
+    
+    # Scale data
+    prediction_set = get_scaledTable(df = prediction_set_ns, scaling_factors = trained_sysSVM$scaling_factors)$df_scaled
+    
+  } else {
+    if (is.character(prediction_set)) prediction_set = readRDS(prediction_set)
+    if (is.character(prediction_set_ns)) prediction_set_ns = readRDS(prediction_set_ns)
+  }
   
   
   # Get decision values and score contributions for each kernel
   scored_data = prediction_set_ns # Record the unscaled features
-  for (k in names(trained_sysSVM)){
+  for (k in names(trained_sysSVM$models)){
     # Apply the ocSVM
-    dv = predict(trained_sysSVM[[k]]$svm_model, newdata = prediction_set, decision.values = TRUE) # But predict on scaled features
+    dv = predict(trained_sysSVM$models[[k]]$svm_model, newdata = prediction_set, decision.values = TRUE) # But predict on scaled features
     
     
     # Extract decision values
@@ -666,7 +722,7 @@ predict_sysSVM2 = function(trained_sysSVM, prediction_set, prediction_set_ns, sa
     
     
     # Sensitivity weighting
-    BMS_i = trained_sysSVM[[k]]$sensitivity_mean #/ trained_sysSVM[[k]]$sensitivity_var
+    BMS_i = trained_sysSVM$models[[k]]$sensitivity_mean #/ trained_sysSVM$models[[k]]$sensitivity_var
     
     
     # Score contribution
@@ -691,7 +747,7 @@ predict_sysSVM2 = function(trained_sysSVM, prediction_set, prediction_set_ns, sa
   
   
   # Average scores from the different kernels
-  scored_data$score = apply(scored_data %>% select(paste(names(trained_sysSVM), "score", sep = "_")), 1, mean)
+  scored_data$score = apply(scored_data %>% select(paste(names(trained_sysSVM$models), "score", sep = "_")), 1, mean)
   
   
   # Patient-specific ranks

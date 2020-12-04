@@ -7,22 +7,19 @@ sysSMV2 is a computational tool for patient-specific cancer driver gene prioriti
 Models that have been trained on data from TCGA are available to download from the appropriate [directory](trained_models). For smaller TCGA cohorts (N <200 samples), we recommend using the model trained on pan-cancer data. 
 \
 \
-Users may also train their own sysSVM2 models. Training sysSVM2 requires a cohort of cancer samples. There are four broad steps to the algorithm: 
-1. **Feature mapping**: identify the molecular and systems-level properties of damaged genes in the cohort; mark canonical drivers as a training set
-1. **Model selection**: tune SVM parameters to optimise performance, based on the sensitivity on the training set 
-1. **Training**: train the model with the selected parameters
-1. **Prediction**: predict on new samples/genes, assigning a score to each. If necessary, extract a list of the canonical drivers in each sample, 'topped up' with the highest-scoring predictions from the algorithm.
-
-[//]: # (end list)
+Users may also train their own sysSVM2 models. 
 
 ## Download/installation
-To download sysSVM2, clone this repository.
+To download sysSVM2, clone this repository. sysSVM2 is implemented in R. In this guide, we assume that the user's working directory corresponds to a clone of this repository.
 
-## Running sysSVM2
-In this guide, we assume that the user's working directory corresponds to a clone of this repository. We also assume that results are output to a directory called ```~/test_sysSVM2```. sysSVM2 is implemented in R.
+## Running a pre-trained sysSVM2 model on your data
+If you have your own data and want to predict driver genes without training a new model, there are two steps:
+1. **Data annotation**: sysSVM2 requires mutation and copy number data in a particular format
+1. **Prediction**: use one of the [pre-trained models](trained_models) to identify drivers in individual samples.
+[//]: # (end list)
 
-### 0. Data annotation
-In addition to gene systems-level properties, sysSVM2 uses somatic mutation and CNV data summarised at the gene-level (molecular properties). These gene-level summaries can be produced from standard variant call file formats using the annotation functions provided in this repository. In R, first source these functions:
+### 1. Data annotation
+sysSVM2 uses somatic mutation and CNV data summarised at the gene-level (molecular properties). These gene-level summaries can be produced from standard variant call file formats using the annotation functions provided in this repository. In R, first source these functions:
 ```
 source("R/annotation_functions.R")
 ```
@@ -51,8 +48,36 @@ molecular_data = make_totalTable(
 )
 ```
 
+### 2. Prediction
+A pre-trained model can now be used to make predictions on your annotated data. First, load one of the provided pre-trained models. For example, the model trained on pan-cancer data:
+```
+trained_sysSVM = readRDS("trained_models/PANCAN_trained_sysSVM.rds")
+```
+Then simply run the trained model on your annotated data:
+```
+predictions = predict_sysSVM2(
+  trained_sysSVM, 
+  molecular_data = molecular_data, 
+  systemsLevel_data = "example_data/systemsLevel_features_allGenes.tsv"
+)
+```
+The output is a ranked list of damaged genes in each patient, with high scores/ranks corresponding to putative driver genes. 
+
+
+## Training a new sysSVM2 model
+Training sysSVM2 requires a cohort of cancer samples. There are four broad steps to the algorithm: 
+1. **Feature mapping**: identify the molecular and systems-level properties of damaged genes in the cohort; mark canonical drivers as a training set
+1. **Model selection**: tune SVM parameters to optimise performance, based on the sensitivity on the training set 
+1. **Training**: train the model with the selected parameters
+1. **Prediction**: predict on new samples/genes, assigning a score to each. If necessary, extract a list of the canonical drivers in each sample, 'topped up' with the highest-scoring predictions from the algorithm.
+
+[//]: # (end list)
+
+In this guide, we assume that the user's working directory corresponds to a clone of this repository. We also assume that results are output to a directory called ```~/test_sysSVM2```. 
+
+
 ### 1. Feature mapping
-After formatting the data for sysSVM2, the process of training and prediction can begin. First, source the relevant R functions:
+After formatting the data for sysSVM2 (see **Data annotation** above), the process of training and prediction can begin. First, source the relevant R functions:
 ```
 source("R/train_predict_functions.R")
 ```
@@ -113,6 +138,7 @@ After model selection, the entire training set is used to train the final sysSVM
 ```
 trained_sysSVM2 = train_sysSVM2(model_parameters = model_selection$best_model_final, 
                                 training_set = sysSVM_data$training_set, 
+                                scaling_factors = sysSVM_data$scaling_factors,
                                 output_dir = "~/test_sysSVM2")
 ```
 ### 4. Prediction
