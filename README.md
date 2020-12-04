@@ -53,7 +53,11 @@ A pre-trained model can now be used to make predictions on your annotated data. 
 ```
 trained_sysSVM = readRDS("trained_models/PANCAN_trained_sysSVM.rds")
 ```
-Then simply run the trained model on your annotated data:
+To run an example without annotating variant call data, you can use the provided (annotated) small cohort:
+```
+molecular_data = read_tsv("example_data/molecular_features_100samples.tsv")
+```
+Then simply run the trained model on the annotated data:
 ```
 predictions = predict_sysSVM2(
   trained_sysSVM, 
