@@ -71,7 +71,7 @@ The output is a ranked list of damaged genes in each patient, with high scores/r
 ## Training a new sysSVM2 model
 Training sysSVM2 requires a cohort of cancer samples. There are four broad steps to the algorithm: 
 1. **Feature mapping**: identify the molecular and systems-level properties of damaged genes in the cohort; mark canonical drivers as a training set
-1. **Model selection**: tune SVM parameters to optimise performance, based on the sensitivity on the training set 
+1. **Model selection**: tune SVM parameters to optimise performance, based on the sensitivity on the training set. This step can also be skipped if you want to use the default kernel parameters.
 1. **Training**: train the model with the selected parameters
 1. **Prediction**: predict on new samples/genes, assigning a score to each. If necessary, extract a list of the canonical drivers in each sample, 'topped up' with the highest-scoring predictions from the algorithm.
 
@@ -120,7 +120,7 @@ After preparing the input file, the next step is to separate the training and pr
 canonical_drivers = readRDS("example_data/canonical_drivers.rds")
 sysSVM_data = prepare_trainingPrediction(sysSVM2_input, canonical_drivers, output_dir = "~/test_sysSVM2")
 ```
-SVM model parameters then need to be tuned. sysSVM2 does this automatically, using three-fold Cross-Validation (CV) over a pre-determined grid of parameter combinations. However, this is a computationally intensive process. If sufficient computational resources are not available, the parameters chosen on pan-cancer data, provided in Table 1 of the sysSVM2 publication, can be used. Alternatively, if users want to train a model on a similar dataset to one for which they have already carried out CV iterations, kernel parameters might be 're-used' to save on computation time.  
+SVM model parameters then need to be tuned. sysSVM2 does this automatically, using three-fold Cross-Validation (CV) over a pre-determined grid of parameter combinations. However, this is a computationally intensive process. If sufficient computational resources are not available, the parameters chosen on simulated pan-cancer data, provided in Supplementary Figure 2 of the sysSVM2 publication, can be used. Skip to Training below if you want to do this. Alternatively, if users want to train a model on a similar dataset to one for which they have already carried out CV iterations, kernel parameters might be 're-used' to save on computation time.  
 \
 To run the CV iterations as efficiently as possible, the code is designed to run in a parallel environment. For example, to perform 10 CV iterations using 4 cores, run
 ```
@@ -145,6 +145,7 @@ trained_sysSVM2 = train_sysSVM2(model_parameters = model_selection$best_model_fi
                                 scaling_factors = sysSVM_data$scaling_factors,
                                 output_dir = "~/test_sysSVM2")
 ```
+If you want to use the default SVM parameters learned from simulated pan-cancer data, simply do not provide a ```model_parameters``` argument.
 ### 4. Prediction
 The trained model can now be used to make predictions, either on the same cohort or on new samples. To use the prediction set from the same cohort used for training:
 ```
