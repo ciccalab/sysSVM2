@@ -32,6 +32,8 @@ ssms_annotated = annotate_ssms(
   hotspots = "annotation_reference_files/tcga_pancancer_hotspots_oncodriveclust.tsv"
 )
 ```
+Note that, by default, mutation hotspots identified in TCGA pan-cancer data are mapped to SSMs in order to identify gain-of-function mutations.
+\
 Annotation of CNV segments requires [bedtools](https://bedtools.readthedocs.io/en/latest/) to be installed. If available, sample ploidy values can be used to filter copy number gains. To intersect CNV segments with gene coordinates and identify gene gains and losses, run the following:
 ```
 cnvs_annotated = annotate_cnvs(
