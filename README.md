@@ -23,10 +23,10 @@ sysSVM2 uses somatic mutation and CNV data summarised at the gene-level (molecul
 ```
 source("R/annotation_functions.R")
 ```
-Annotation of small somatic mutations (SSMs, *i.e.* SNVs and indels) requires [ANNOVAR](https://doc-openbio.readthedocs.io/projects/annovar/en/latest/) to be installed. A VCF file (aligned to  hg19 in this example) can be converted to annotated SSMs as follows:
+Annotation of small somatic mutations (SSMs, *i.e.* SNVs and indels) requires [ANNOVAR](https://doc-openbio.readthedocs.io/projects/annovar/en/latest/) to be installed. A single-sample VCF file (aligned to  hg19 in this example) can be converted to annotated SSMs as follows:
 ```
 ssms_annotated = annotate_ssms(
-  vcf_fn, annovar_dir, 
+  vcf_fn, sample = "my_sample", annovar_dir, 
   genome_version = "hg19", 
   gene_aliases_entrez = "annotation_reference_files/gene_aliases_entrez.tsv", 
   hotspots = "annotation_reference_files/tcga_pancancer_hotspots_oncodriveclust.tsv"
