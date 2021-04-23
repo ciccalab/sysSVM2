@@ -119,6 +119,7 @@ map_hotspots = function(
 # gene_aliases_entrez and hotspots can be passed as data frames or file names
 annotate_ssms = function(
   vcf_fn,                    # File name of somatic VCF to annotate
+  sample,                    # Name of this sample (NB can't process multi-sample VCFs)
   annovar_dir,               # Directory where ANNOVAR is installed (should contain table_annovar.pl)
   genome_version = "hg19",   # Version of the human genome to use for ANNOVAR - hg19 or hg38
   gene_aliases_entrez,       # gene_aliases_entrez.tsv from the sysSVM2 GitHub repository
@@ -239,10 +240,11 @@ annotate_ssms = function(
       TRUNC_mut = dam_trunc,
       NTDam_mut = dam_func | dam_cons | dam_splicing,
       GOF_mut = is_hotspot,
-      damaging = TRUNC_mut | NTDam_mut | GOF_mut
+      damaging = TRUNC_mut | NTDam_mut | GOF_mut,
+      sample = sample
     ) %>%
     select(
-      variant_id, symbol, entrez, Func.refGene, ExonicFunc.refGene,
+      sample, variant_id, symbol, entrez, Func.refGene, ExonicFunc.refGene,
       TRUNC_mut, NTDam_mut, GOF_mut, damaging
     )
   
