@@ -68,7 +68,14 @@ predictions = predict_sysSVM2(
   systemsLevel_data = "example_data/systemsLevel_features_allGenes.tsv"
 )
 ```
-The output is a ranked list of damaged genes in each patient, with high scores/ranks corresponding to putative driver genes. 
+The output is a ranked list of damaged genes in each patient, with high scores/ranks corresponding to putative driver genes. You can 'top up' the canonical driver genes using the highest-ranked sysSVM2 predictions, e.g. to a minimum of five drivers per patient, by running:
+```
+drivers_toppedUp = topUp_drivers(
+  gene_scores = predictions,
+  canonical_drivers = "example_data/canonical_drivers.rds",
+  n_drivers_per_sample = 5
+)
+```
 
 
 ## Training a new sysSVM2 model

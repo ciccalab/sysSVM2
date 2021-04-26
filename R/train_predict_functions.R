@@ -771,19 +771,32 @@ predict_sysSVM2 = function(trained_sysSVM,
 
 
 # Get lists of predicted drivers for each sample, by topping up canonical drivers with high-scored predictions
-topUp_drivers = function(all_genes, gene_scores, canonical_drivers, n_drivers_per_sample = 5, output_dir = NULL, sample_gene_sep = "__"){
+topUp_drivers = function(
+  gene_scores, 
+  canonical_drivers = "example_data/canonical_drivers.rds", 
+  entrez_geneSymbol_mapping = "annotation_reference_files/gene_aliases_entrez.tsv",
+  n_drivers_per_sample = 5, 
+  output_dir = NULL, 
+  sample_gene_sep = "__", 
+  all_genes = NULL){
   
   require(tidyr)
   require(tibble)
   require(dplyr)
   
   
-  # Extract list of all damaged genes from list object
-  all_genes = rbind(all_genes$training_set_ns %>% select(-type), all_genes$prediction_set_ns) %>%
-    rownames_to_column("id") %>%
-    separate(id, into = c("sample", "entrez"), sep = sample_gene_sep) %>%
-    mutate(entrez = as.numeric(entrez)) %>%
-    select(sample, entrez)
+  # Extract list of all damaged genes from list object if training denovo (need training and prediction genes altogether)
+  if (!is.null(all_genes)){
+    all_genes = rbind(all_genes$training_set_ns %>% select(-type), all_genes$prediction_set_ns) %>%
+      rownames_to_column("id") %>%
+      separate(id, into = c("sample", "entrez"), sep = sample_gene_sep) %>%
+      mutate(entrez = as.numeric(entrez)) %>%
+      select(sample, entrez)
+  } else {
+    # If we're using a pre-trained model then all genes will be in the gene_scores data frame
+    all_genes = gene_scores %>%
+      select(sample, entrez)
+  }
   
   
   # For gene_scores, require sample, entrez, and score columns
@@ -821,6 +834,12 @@ topUp_drivers = function(all_genes, gene_scores, canonical_drivers, n_drivers_pe
            rank = rank(-score, na.last = "keep")) %>%
     ungroup %>%
     subset(canonical_driver | rank <= n_topUp_thisSample)
+  
+  
+  # Annotate gene symbols
+  if (is.character(entrez_geneSymbol_mapping)) entrez_geneSymbol_mapping = read_tsv(entrez_geneSymbol_mapping, col_types = cols())
+  entrez_geneSymbol_mapping = entrez_geneSymbol_mapping %>% select(entrez, symbol) %>% unique
+  topUp = topUp %>% left_join(entrez_geneSymbol_mapping, by = "entrez")
   
   
   # Save
