@@ -783,6 +783,7 @@ topUp_drivers = function(
   require(tidyr)
   require(tibble)
   require(dplyr)
+  require(tools)
   
   
   # Extract list of all damaged genes from list object if training denovo (need training and prediction genes altogether)
@@ -812,6 +813,14 @@ topUp_drivers = function(
   #  2. A data frame with an entrez column
   #  3. A list of Entrez IDs
   # Convert whatever is provided into a vector
+  if (is.character(canonical_drivers) & length(canonical_drivers) == 1){
+    extension = tools::file_ext(canonical_drivers)
+    if (extension == "rds"){
+      canonical_drivers = readRDS(canonical_drivers)
+    } else {
+      canonical_drivers = read_tsv(canonical_drivers)
+    }
+  }
   if (is.data.frame(canonical_drivers)){
     canonical_drivers = canonical_drivers %>% pull(entrez)
   } else if (is.list(canonical_drivers)){
