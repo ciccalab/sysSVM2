@@ -841,8 +841,13 @@ topUp_drivers = function(
            less5_flag = n() <= 5,
            n_topUp_thisSample = max(0, n_drivers_per_sample - n_canonical_thisSample),
            rank = rank(-score, na.last = "keep")) %>%
+    # If using a pre-trained model, scores will not be NA so handle canonical drivers explicitly
+    mutate(
+      rank_nonCanonicalOnly = case_when(canonical_driver ~ NA_real_, T ~ rank),
+      rank_nonCanonicalOnly = rank(rank_nonCanonicalOnly, na.last = "keep")
+      ) %>%
     ungroup %>%
-    subset(canonical_driver | rank <= n_topUp_thisSample)
+    subset(canonical_driver | rank_nonCanonicalOnly <= n_topUp_thisSample)
   
   
   # Annotate gene symbols
