@@ -287,7 +287,7 @@ annotate_cnvs = function(
   # Make sure we have the correct columns
   if (!("copy_number" %in% colnames(cnv_segments))){ # Can provide either segment mean or copy number (preferentially copy number)
     if ("segment_mean" %in% colnames(cnv_segments)){
-      cnv_segments$copy_number = round(2^cnv_segments$segment_mean)
+      cnv_segments$copy_number = round(2^cnv_segments$segment_mean * 2)
     } else {
       stop("Must provide either a copy_number or segment_mean column in cnv_segments")
     }
